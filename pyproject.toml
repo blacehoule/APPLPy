@@ -30,7 +30,14 @@ classifiers = [
 dev = [
   "ipython",
   "jupyter",
+  "ruff",
 ]
 
 [tool.setuptools]
 packages = ["applpy", "applpy.test"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint.per-file-ignores]
+"applpy/__init__.py" = ["E402", "F403", "F405"]
