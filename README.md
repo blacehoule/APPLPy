@@ -58,10 +58,11 @@ To install development dependencies (`ipython` and `jupyter`) as well:
 uv sync --extra dev
 ```
 
-After installation:
+After installation, prefer explicit module-level imports:
 
 ```python
-from applpy import *
+from applpy.dist_type import ExponentialRV
+from applpy.rv import CDF
 ```
 
 ## Options for Running APPLPy
@@ -70,13 +71,11 @@ APPLPy can be run from any python interactive session. For fast performance, use
 
 SymPy includes a convenient command for initializing variables and setting up optimal plotting and printing environments. To leverage this initialization procedure, the recommended series of commands to begin an APPLPy session are as follows:
 ```python
-from sympy import *; init_session()
+from sympy import Rational, Symbol, init_session
+from applpy.dist_type import ExponentialRV, NormalRV
+from applpy.rv import CDF, Mean
 
-from applpy import *
+init_session()
 ```
 
-## Operating System Compatibility
-
-Since APPLPy has been developed entirely in Python, it is compatible with almost any operating system. APPLPy will run happily on Window, Linux or OSX.
-
-If you have any comments or suggestions for APPLPy, feel free to contact the author at mthw.wm.robinson@gmail.com. Users with Python experience are encouraged to get in touch and contribute.
+Using explicit imports keeps namespaces clean and makes dependencies clearer. Avoid `from ... import *` in new code.
