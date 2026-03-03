@@ -2421,10 +2421,9 @@ def MeanDiscrete(RVar):
             raise RVError(err_string)
     # Convert the random variable to PDF form
     X_dummy = PDF(RVar)
-    # Convert the value and the support of the pdf to numpy
-    #   matrices
-    support = np.matrix(X_dummy.support)
-    pdf = np.matrix(X_dummy.func)
+    # Convert support and pdf values to numpy arrays
+    support = np.asarray(X_dummy.support, dtype=object)
+    pdf = np.asarray(X_dummy.func, dtype=object)
     # Use the numpy element wise multiplication function to
     #   determine a vector of the values of f(x)*x
     vals = np.multiply(support, pdf)
@@ -3073,17 +3072,29 @@ def Transform(RVar, gXt):
             # Create a list of possible inverses
             invlist = solve(gX[0][i] - t, x)
             # Use the test point to determine the correct inverse
+            selected_inverse = False
             for j in range(len(invlist)):
                 # If g-1(g(c))=c, then the inverse is correct
                 test = invlist[j].subs(t, gX[0][i].subs(x, c))
-                # if test.__class__.__name__ != 'Mul':
+                if simplify(test - c) == 0:
+                    ginv.append(invlist[j])
+                    selected_inverse = True
+                    break
                 try:
                     if test <= Float(float(c), 10) + 0.0000001:
                         if test >= Float(float(c), 10) - 0.0000001:
                             ginv.append(invlist[j])
+                            selected_inverse = True
+                            break
                 except Exception:
                     if j == len(invlist) - 1 and len(ginv) < i + 1:
                         ginv.append(None)
+                        selected_inverse = True
+            # Some symbolic comparisons do not trigger either branch above.
+            # Fall back to the only available inverse when the mapping is
+            # unambiguous.
+            if not selected_inverse and len(invlist) == 1:
+                ginv.append(invlist[0])
         # Find the transformation function for each segment'
         seg_func = []
         for i in range(len(X_dummy.func)):
@@ -3091,6 +3102,8 @@ def Transform(RVar, gXt):
             for j in range(len(gX[0])):
                 if gX[1][j] >= X_dummy.support[i]:
                     if gX[1][j + 1] <= X_dummy.support[i + 1]:
+                        if j >= len(ginv) or ginv[j] is None:
+                            continue
                         # print X_dummy.func[i], ginv[j]
                         if not isinstance(X_dummy.func[i], (float, int)):
                             tran = X_dummy.func[i].subs(x, ginv[j])
@@ -3381,8 +3394,8 @@ def VarDiscrete(RVar):
     EX = MeanDiscrete(RVar)
     # Convert the values and support of the random variable
     #   to vector form
-    support = np.matrix(RVar.support)
-    pdf = np.matrix(RVar.func)
+    support = np.asarray(RVar.support, dtype=object)
+    pdf = np.asarray(RVar.func, dtype=object)
     # Find E(X^2) by creating a vector containing the values
     #   of f(x)*x**2 and summing the result
     supportsqr = np.multiply(support, support)
@@ -4322,25 +4335,23 @@ def ProductDiscrete(RVar1, RVar2):
     X_dummy1 = PDF(RVar1)
     X_dummy2 = PDF(RVar2)
     # Convert the support and the value of each random variable
-    #   into a numpy matrix
-    support1 = np.matrix(X_dummy1.support)
-    support2 = np.matrix(X_dummy2.support)
-    pdf1 = np.matrix(X_dummy1.func)
-    pdf2 = np.matrix(X_dummy2.func)
+    #   into numpy arrays
+    support1 = np.asarray(X_dummy1.support, dtype=object)
+    support2 = np.asarray(X_dummy2.support, dtype=object)
+    pdf1 = np.asarray(X_dummy1.func, dtype=object)
+    pdf2 = np.asarray(X_dummy2.func, dtype=object)
     # Find all possible values of support1*support2 and val1*val2
-    #   by computing (X1)'*X2, flatten into a row vector
-    prodsupport = support1.T * support2
-    prodsupport = prodsupport.flatten()
-    prodpdf = pdf1.T * pdf2
-    prodpdf = prodpdf.flatten()
+    #   via the pairwise outer product, flatten into vectors
+    prodsupport = np.outer(support1, support2).flatten()
+    prodpdf = np.outer(pdf1, pdf2).flatten()
     #
     # Stack the support vector and the value vector into a matrix
     # prodmatrix=np.vstack([prodsupport,prodpdf]).T
     #
     #
     # Convert the resulting vectors into lists
-    supportlist = prodsupport.tolist()[0]
-    pdflist = prodpdf.tolist()[0]
+    supportlist = prodsupport.tolist()
+    pdflist = prodpdf.tolist()
     # Sort the function and support lists for the product
     sortlist = list(zip(supportlist, pdflist))
     sortlist.sort()
@@ -4526,8 +4537,10 @@ def PlotDist(RVar, suplist=None, opt=None, color="r", display=True):
 
         # print plotfunc, plotsupp
         for i, function in enumerate(plotfunc):
+
             def f(y):
                 return function.subs(x, y).evalf()
+
             x_range = np.arange(
                 plotsupp[i], plotsupp[i + 1], abs(plotsupp[i + 1] - plotsupp[i]) / 1000
             )
