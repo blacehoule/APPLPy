@@ -98,5 +98,3 @@ from applpy.rv import CDF, Mean
 
 init_session()
 ```
-
-Using explicit imports keeps namespaces clean and makes dependencies clearer. Avoid `from ... import *` in new code.

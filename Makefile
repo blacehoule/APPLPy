@@ -13,5 +13,5 @@ check: ## Run Ruff lint checks.
 	uv run ruff check applpy
 
 tidy: ## Run Ruff autoformatter.
-	uv run ruff check --fix --unsafe-fixes applpy
+	uv run ruff check --fix applpy
 	uv run ruff format applpy
