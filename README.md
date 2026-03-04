@@ -1,6 +1,5 @@
 # APPLPy
-[![Tests](https://github.com/MthwRobinson/APPLPy/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MthwRobinson/APPLPy/actions/workflows/ci.yml?query=branch%3Amain)
-[![Coverage](https://img.shields.io/badge/coverage-29%25-brightgreen)](https://github.com/MthwRobinson/APPLPy/actions/workflows/ci.yml?query=branch%3Amain)
+
 ### A Probability Programming Language -- Python Edition
 
 ## What is APPLPy?
