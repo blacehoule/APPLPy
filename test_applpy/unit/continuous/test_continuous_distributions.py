@@ -1,26 +1,23 @@
 import pytest
 from sympy import Rational, exp, ln, oo
 
-from applpy.dist_type import (
+from applpy.distributions.continuous import (
     ArcSinRV,
     ArcTanRV,
-    BernoulliRV,
-    BetaRV,
-    BinomialRV,
     BivariateNormalRV,
+    BetaRV,
     CauchyRV,
     ChiRV,
     ChiSquareRV,
     ErlangRV,
     ErrorIIRV,
     ErrorRV,
-    ExponentialRV,
     ExponentialPowerRV,
+    ExponentialRV,
     ExtremeValueRV,
     FRV,
     GammaRV,
     GeneralizedParetoRV,
-    GeometricRV,
     GompertzRV,
     IDBRV,
     InverseGammaRV,
@@ -36,16 +33,14 @@ from applpy.dist_type import (
     MuthRV,
     NormalRV,
     ParetoRV,
-    PoissonRV,
     RayleighRV,
     TRV,
     TriangularRV,
-    UniformDiscreteRV,
     UniformRV,
     WeibullRV,
     param_check,
 )
-from applpy.rv import CDF, Mean, RVError, x
+from applpy.rv import CDF, RVError, x
 
 
 def test_param_check_detects_unspecified_symbol_parameters():
@@ -72,30 +67,6 @@ def test_continuous_distribution_constructors_have_expected_structure():
     assert weibull.ftype == ["continuous", "pdf"]
     assert weibull.support == [0, oo]
     assert weibull.cdf.subs(x, Rational(1, 2)) == 1 - exp(-1)
-
-
-def test_discrete_distribution_constructors_have_expected_structure():
-    binomial = BinomialRV(4, Rational(1, 2))
-    bernoulli = BernoulliRV(Rational(1, 3))
-    geometric = GeometricRV(Rational(1, 4))
-    poisson = PoissonRV(3)
-    uniform_discrete = UniformDiscreteRV(1, 5, 2)
-
-    assert binomial.ftype == ["Discrete", "pdf"]
-    assert binomial.support == [0, 4]
-
-    assert bernoulli.ftype == ["Discrete", "pdf"]
-    assert bernoulli.support == [0, 1]
-
-    assert geometric.ftype == ["Discrete", "pdf"]
-    assert geometric.support == [1, oo]
-
-    assert poisson.ftype == ["Discrete", "pdf"]
-    assert poisson.support == [0, oo]
-
-    assert uniform_discrete.ftype == ["discrete", "pdf"]
-    assert uniform_discrete.support == [1, 3, 5]
-    assert uniform_discrete.func == [Rational(1, 3), Rational(1, 3), Rational(1, 3)]
 
 
 def test_exponential_variate_supports_special_and_inverse_methods():
@@ -156,23 +127,6 @@ def test_parameter_validation_errors_for_common_distributions():
     with pytest.raises(RVError, match="parameters must be in ascending order"):
         UniformRV(2, 1)
 
-    with pytest.raises(RVError, match="p must be between 0 and 1"):
-        BinomialRV(2, 1)
-
-    with pytest.raises(RVError, match="p must be between 0 and 1"):
-        GeometricRV(0)
-
-    with pytest.raises(RVError, match="theta must be positive"):
-        PoissonRV(0)
-
-    with pytest.raises(RVError, match="b is only valid if b > a"):
-        UniformDiscreteRV(5, 4)
-
-
-def test_uniform_discrete_validation_for_step_divisibility():
-    with pytest.raises(RVError, match="divisble by k"):
-        UniformDiscreteRV(0, 5, 2)
-
 
 def test_bivariate_normal_parameter_validation_and_shape():
     rv = BivariateNormalRV(0, 1, 1, Rational(1, 2))
@@ -190,11 +144,9 @@ def test_bivariate_normal_parameter_validation_and_shape():
         BivariateNormalRV(0, 1, 0, 0)
 
 
-def test_weibull_cdf_shortcut_and_binomial_mean_are_consistent():
+def test_weibull_cdf_shortcut_is_consistent():
     rv = WeibullRV(2, 3)
     assert CDF(rv, Rational(1, 2)) == 1 - exp(-1)
-
-    assert Mean(BinomialRV(4, Rational(1, 2))) == 2
 
 
 @pytest.mark.parametrize(
