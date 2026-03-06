@@ -135,15 +135,48 @@ Run lint checks locally:
 make check
 ```
 
-Run a specific module directly with `pytest`:
+## Example Workflows
 
-```shell
-uv run pytest -q test_applpy/functional/test_notebook_examples.py
-```
+The following are a few examples of how to use APPLPy.
 
-After installation, prefer explicit module-level imports:
+### Exponential Distribution
 
 ```python
-from applpy.dist_type import ExponentialRV
-from applpy.rv import CDF
+from sympy import Rational
+from applpy import CDF, HF, Mean, ExponentialRV
+
+x_rv = ExponentialRV(Rational(1, 100))
+print(Mean(x_rv))   # 100
+print(CDF(x_rv, 0)) # 0
+print(HF(x_rv, 0))  # 1/100
+```
+
+### Triangular Portfolio
+
+```python
+from applpy import CDF, Mean, Variance, TriangularRV
+
+inv_1 = TriangularRV(-2, 1, 3)
+inv_2 = TriangularRV(-10, 3, 20)
+portfolio = inv_1 + inv_2
+
+print(CDF(inv_1, 0))   # 4/15
+print(Variance(inv_1)) # 19/18
+print(Mean(portfolio)) # 5
+```
+
+### Mixture and IID Convolution
+
+```python
+from sympy import Rational
+from applpy import CDF, ConvolutionIID, Mean, Mixture, TriangularRV, UniformRV
+
+mix = Mixture(
+    [Rational(1, 4), Rational(1, 4), Rational(1, 2)],
+    [TriangularRV(2, 4, 6), TriangularRV(3, 5, 7), TriangularRV(1, 5, 9)],
+)
+
+print(Mean(mix))                  # 19/4
+print(float(CDF(mix, 4).evalf())) # 0.296875
+print(float(Mean(ConvolutionIID(UniformRV(1, 2), 3)).evalf())) # 4.5
 ```
