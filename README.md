@@ -85,6 +85,8 @@ Build and install the Rust extension into the project environment:
 make rust-develop
 ```
 
+Use this for local development so Python imports the locally built Rust module from your active environment.
+
 Validate import and call a dummy Rust function:
 
 ```shell
@@ -92,6 +94,19 @@ make rust-check-import
 ```
 
 `--no-sync` is used for these commands so `uv run` does not prune the `maturin develop` install.
+
+## Build Distribution Artifacts (Including Rust Bindings)
+
+Create all distribution artifacts in `dist/`:
+
+```shell
+make build-dist-rust
+```
+
+This produces:
+
+1. APPLPy Python source/wheel artifacts from `uv build`
+2. A platform-specific Rust extension wheel from `maturin build`
 
 ## Development Commands
 
