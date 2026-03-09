@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-test install-all test test-functional test-unit check tidy docker-build docker-run docker-run-jupter
+.PHONY: help install install-dev install-test install-rust install-all rust-develop rust-check-import test test-functional test-unit check tidy docker-build docker-run docker-run-jupter
 
 TEST ?=
 
@@ -9,22 +9,40 @@ install: ## Install base project dependencies.
 	uv sync
 
 install-dev: ## Install project with development dependencies.
-	uv sync --extra dev
+	uv sync --extra dev --extra rust
 
 install-test: ## Install project with test dependencies.
-	uv sync --extra test
+	uv sync --extra test --extra dev --extra rust
 
 install-all: ## Install project with all optional dependencies.
 	uv sync --all-extras
 
+rust-develop: ## Build and install the Rust extension into the active uv environment.
+	uv run --no-sync maturin develop -m rust/Cargo.toml
+
+rust-check-import: ## Verify APPLPy can call the Rust dummy function.
+	uv run --no-sync python -c "from applpy.rust_bindings import dummy_ping; print(dummy_ping())"
+
 test: ## Run all tests, or one test when TEST=/path/to/test is provided.
-	uv run pytest --cov=applpy --cov-report=term-missing $(if $(strip $(TEST)),$(TEST),test_applpy)
+	PYTHONPATH=. \
+		uv run --no-sync \
+		pytest --cov=applpy --cov-report=term-missing \
+		$(if $(strip $(TEST)),$(TEST),test_applpy)
 
 test-functional: ## Run functional tests, or TEST=/path/to/test to target one test.
-	uv run pytest --cov=applpy --cov-report=term-missing $(if $(strip $(TEST)),$(TEST),test_applpy/functional)
+	PYTHONPATH = . \
+		uv run --no-sync \
+		pytest --cov=applpy --cov-report=term-missing \
+		$(if $(strip $(TEST)),$(TEST),test_applpy/functional)
 
 test-unit: ## Run unit tests, or TEST=/path/to/test to target one test.
-	uv run pytest --cov=applpy --cov-report=term-missing $(if $(strip $(TEST)),$(TEST),test_applpy/unit)
+	PYTHONPATH=. \
+		uv run --no-sync \
+		pytest --cov=applpy --cov-report=term-missing \
+		$(if $(strip $(TEST)),$(TEST),test_applpy/unit)
+
+ipython: ## Runs iPython with --no-sync to ensure rust bindings are preserved
+	uv run --no-sync ipython
 
 check: ## Run Ruff lint checks.
 	uv run ruff check applpy test_applpy
