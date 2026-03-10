@@ -1,8 +1,28 @@
-// Given the previous combination, finds the next lexicographical combination.
+/// Given the previous combination, finds the next lexicographical combination.
+///
+/// # Arguments
+/// * `previous` - the previous combination
+/// * `upper_bound` - the maximum allowed value in the combination
+///
+/// # Returns
+/// * `next` - the next combination
+///
+/// # Examples
+///
+/// ```
+/// let c = vec![0, 1, 2];
+/// assert_eq!(next_combination(&c, 4), Some(vec![0, 1, 3]));
+///
+/// let c = vec![0, 1, 4];
+/// assert_eq!(next_combination(&c, 4), Some(vec![0, 2, 3]));
+///
+/// let c = vec![2, 3, 4];
+/// assert_eq!(next_combination(&c, 4), None);
+/// ```
 pub fn next_combination(previous: &[usize], upper_bound: usize) -> Option<Vec<usize>> {
-    let k = previous.len();
+    let vector_length = previous.len();
 
-    if k == 0 || k > upper_bound + 1 {
+    if vector_length == 0 || vector_length > upper_bound + 1 {
         return None;
     }
 
@@ -12,8 +32,8 @@ pub fn next_combination(previous: &[usize], upper_bound: usize) -> Option<Vec<us
 
     let mut next = previous.to_vec();
 
-    for i in (0..k).rev() {
-        if next[i] < upper_bound + i + 1 - k {
+    for i in (0..vector_length).rev() {
+        if next[i] < upper_bound + i + 1 - vector_length {
             next[i] += 1;
 
             let mut val = next[i];
@@ -29,9 +49,49 @@ pub fn next_combination(previous: &[usize], upper_bound: usize) -> Option<Vec<us
     None
 }
 
+/// Given the previous permutation, finds the next lexicographical permutation.
+///
+/// # Arguments
+/// * `previous` - the previous permutation
+///
+/// # Returns
+/// * `next` - the next combination
+#[allow(dead_code)]
+pub fn next_permutation(previous: &[usize]) -> Option<Vec<usize>> {
+    let vector_length = previous.len();
+
+    if vector_length == 0 {
+        return None;
+    }
+
+    let mut next = previous.to_vec();
+
+    for i in (1..vector_length).rev() {
+        let index = i - 1;
+        if next[index] < next[index + 1] {
+            let original_value = next[index];
+            let mut swap_index = index + 1;
+
+            for j in (swap_index..vector_length).rev() {
+                if next[j] > original_value {
+                    swap_index = j;
+                    break;
+                }
+            }
+
+            next.swap(index, swap_index);
+            next[index + 1..].reverse();
+
+            return Some(next);
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
-    use super::next_combination;
+    use super::{next_combination, next_permutation};
 
     #[test]
     fn increments_last_value_when_below_upper_bound() {
@@ -131,5 +191,52 @@ mod tests {
     fn test_single_element_combination() {
         assert_eq!(next_combination(&[2], 4), Some(vec![3]));
         assert_eq!(next_combination(&[4], 4), None);
+    }
+
+    #[test]
+    fn test_next_permutation_increments_last_two_values() {
+        assert_eq!(next_permutation(&[1, 2, 3]), Some(vec![1, 3, 2]));
+    }
+
+    #[test]
+    fn test_next_permutation_updates_suffix_after_swap() {
+        assert_eq!(next_permutation(&[1, 3, 2]), Some(vec![2, 1, 3]));
+    }
+
+    #[test]
+    fn test_next_permutation_returns_none_for_last_ordering() {
+        assert_eq!(next_permutation(&[3, 2, 1]), None);
+    }
+
+    #[test]
+    fn test_next_permutation_empty_input() {
+        assert_eq!(next_permutation(&[]), None);
+    }
+
+    #[test]
+    fn test_next_permutation_single_element() {
+        assert_eq!(next_permutation(&[7]), None);
+    }
+
+    #[test]
+    fn test_next_permutation_full_sequence_progression() {
+        let mut p = vec![0, 1, 2];
+        let mut results = Vec::new();
+
+        while let Some(next) = next_permutation(&p) {
+            results.push(next.clone());
+            p = next;
+        }
+
+        assert_eq!(
+            results,
+            vec![
+                vec![0, 2, 1],
+                vec![1, 0, 2],
+                vec![1, 2, 0],
+                vec![2, 0, 1],
+                vec![2, 1, 0],
+            ]
+        );
     }
 }
