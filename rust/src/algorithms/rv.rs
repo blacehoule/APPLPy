@@ -12,8 +12,12 @@ pub enum Number {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionalForm {
-    Pdf,
     Cdf,
+    Chf,
+    Hf,
+    Idf,
+    Pdf,
+    Sf,
 }
 
 #[derive(Debug, Clone, PartialEq)]

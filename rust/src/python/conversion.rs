@@ -2,7 +2,7 @@ use pyo3::conversion::FromPyObject;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 
-use crate::algorithms::rv::Number;
+use crate::algorithms::rv::{DomainType, FunctionalForm, Number};
 use num_rational::Rational64;
 
 /// Ensures Python lists that could contain floats, integers
@@ -27,5 +27,36 @@ impl<'py> FromPyObject<'py> for Number {
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             "Expected int, float, or sympy.Rational",
         ))
+    }
+}
+
+impl<'py> FromPyObject<'py> for FunctionalForm {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let s: String = obj.extract()?;
+        match s.as_str() {
+            "cdf" => Ok(FunctionalForm::Cdf),
+            "chf" => Ok(FunctionalForm::Chf),
+            "hf" => Ok(FunctionalForm::Hf),
+            "idf" => Ok(FunctionalForm::Idf),
+            "pdf" => Ok(FunctionalForm::Pdf),
+            "sf" => Ok(FunctionalForm::Sf),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(
+                "Invalid FunctionalForm",
+            )),
+        }
+    }
+}
+
+impl<'py> FromPyObject<'py> for DomainType {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let s: String = obj.extract()?;
+        match s.as_str() {
+            "continuous" => Ok(DomainType::Continuous),
+            "discrete" => Ok(DomainType::Discrete),
+            "Discrete" => Ok(DomainType::DiscreteFunctional),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(
+                "Invalid DomainType",
+            )),
+        }
     }
 }

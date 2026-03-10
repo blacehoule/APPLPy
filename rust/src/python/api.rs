@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 
 use crate::algorithms::order_stat;
 use crate::algorithms::rv;
-use crate::algorithms::rv::Number;
+use crate::algorithms::rv::{DomainType, FunctionalForm, Number};
 
 #[pyfunction(name = "next_combination", signature = (previous, n))]
 pub fn next_combination_py(previous: Vec<usize>, n: usize) -> PyResult<Option<Vec<usize>>> {
@@ -33,4 +33,27 @@ pub fn verify_discrete_pdf_py(function: Vec<Number>, tolerance: Option<f64>) -> 
     Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
         "pdf validation failed",
     ))
+}
+
+#[pyclass]
+pub struct FastRV {
+    inner: rv::RandomVariable,
+}
+
+#[pymethods]
+impl FastRV {
+    #[new]
+    fn new(
+        function: Vec<Number>,
+        support: Vec<Number>,
+        ftype: (FunctionalForm, DomainType),
+    ) -> Self {
+        Self {
+            inner: rv::RandomVariable {
+                function,
+                support,
+                ftype,
+            },
+        }
+    }
 }
