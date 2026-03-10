@@ -32,34 +32,53 @@ pub struct RandomVariable {
 
 impl RandomVariable {
     fn verify_pdf(&self, tolerance: Option<f64>) -> Result<bool, String> {
-        let tolerance = tolerance.unwrap_or(0.00001);
-
         if self.ftype.0 != FunctionalForm::Pdf {
             return Err("verify_pdf only works for PDFs".to_string());
         }
 
-        let mut area: f64 = 0.0;
-        let support_len: usize = self.function.len();
+        verify_pdf(&self.function, tolerance)
+    }
+}
 
-        for i in 0..support_len {
-            let function: f64 = match &self.function[i] {
-                Number::Float(x) => *x,
-                Number::Integer(x) => *x as f64,
-                Number::Rational(x) => x.to_f64().unwrap(),
-            };
+/// Verifies that the area under the PDF of random variable sums to 1
+///
+/// # Arguments
+/// * `function` - the probability mass functon of the RV
+/// * `support` - the support of the RV
+/// * `tolerance` - sets the tolerance for how far the result
+///   can deviate from 1
+///
+/// # Returns
+/// * `valid` - a boolean indicatin if the PDF is valid
+pub fn verify_pdf(function: &[Number], tolerance: Option<f64>) -> Result<bool, String> {
+    let default_tolerance: f64 = 0.000001;
+    let tolerance = tolerance.unwrap_or(default_tolerance);
 
-            let support: f64 = match &self.support[i] {
-                Number::Float(x) => *x,
-                Number::Integer(x) => *x as f64,
-                Number::Rational(x) => x.to_f64().unwrap(),
-            };
+    println!("Now checking for the area ...");
+    let mut area: f64 = 0.0;
+    let mut all_positive: bool = true;
 
-            let probability = function * support;
-            area += probability
+    for function_value in function {
+        let probability: f64 = match &function_value {
+            Number::Float(x) => *x,
+            Number::Integer(x) => *x as f64,
+            Number::Rational(x) => x.to_f64().unwrap(),
+        };
+
+        if probability < 0.0 {
+            all_positive = false;
         }
 
-        Ok((area > 1.0 - tolerance) && (area < 1.0 + tolerance))
+        area += probability;
     }
+    println!("The area under f(x) is: {}", area);
+
+    println!("Now checking for absolute value ...");
+    if !all_positive {
+        return Ok(false);
+    }
+
+    Ok((area > 1.0 - tolerance) && (area < 1.0 + tolerance))
 }
 
 #[cfg(test)]
@@ -123,5 +142,15 @@ mod tests {
         };
 
         assert!(rv.verify_pdf(None).unwrap());
+    }
+
+    #[test]
+    fn verify_pdf_returns_false_with_negative_function_values() {
+        let rv = RandomVariable {
+            function: vec![Number::Float(-0.5), Number::Float(1.5)],
+            support: vec![Number::Float(1.0), Number::Float(1.0)],
+            ftype: (FunctionalForm::Pdf, DomainType::Continuous),
+        };
+        assert!(!rv.verify_pdf(None).unwrap());
     }
 }

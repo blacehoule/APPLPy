@@ -9,7 +9,7 @@ Main Random Variable Module
 
 Class Procedures:
     1. display()
-    1. verifyPDF()
+    1. verify_pdf()
     2. variate(n)
 
 Functional Form Conversion:
@@ -498,7 +498,7 @@ class RV:
         6. latex(self)
         7. save(self,filename)
         8. simplify(self,assumption)
-        9. verifyPDF(self)
+        9. verify_pdf(self)
         10. variate(self,n)
     """
 
@@ -698,9 +698,9 @@ class RV:
         self.support = new_support
         self.display()
 
-    def verifyPDF(self):
+    def verify_pdf(self):
         """
-        Procedure Name: verifyPDF
+        Procedure Name: verify_pdf
         Purpose: Verifies whether or not the random variable is valid. It first
                     checks to make sure the pdf of the random variable
                     integrates to one. It then checks to make sure the random
@@ -793,22 +793,9 @@ class RV:
                 return False
         # If the random variable is discrete, verify the PDF
         if self.ftype[0] == "discrete":
-            # Convert the random variable to PDF form
             X_dummy = PDF(self)
-            # Check to ensure that the area under the PDF is 1
-            print("Now checking for area...")
-            area = sum(X_dummy.func)
-            # for i in range(len(self.support)):
-            #    area+=self.func[i]
-            print("The area under f(x) is: %s" % (area))
-            # Check for absolute value
-            print("Now checking for absolute value...")
-            abs_flag = True
-            for i in range(len(self.func)):
-                if self.func[i] < 0:
-                    abs_flag = False
-            print("The pdf of the random variable")
-            if area > 0.9999 and area < 1.0001 and abs_flag:
+            is_valid = rust_bindings.verify_discrete_pdf(X_dummy.func)
+            if is_valid:
                 print("is valid")
             else:
                 print("is not valid")
@@ -3329,12 +3316,12 @@ def VarDiscrete(RVar):
 def VerifyPDF(RVar):
     """
     Procedure Name: VerifyPDF
-    Purpose: Calls self.verifyPDF(). For compatibility with
+    Purpose: Calls self.verify_pdf(). For compatibility with
                 original APPL syntax
     Arguments:  1. RVar: a discrete random variable
-    Output:     1. A function call to self.verifyPDF()
+    Output:     1. A function call to self.verify_pdf()
     """
-    return RVar.verifyPDF()
+    return RVar.verify_pdf()
 
 
 """
