@@ -58,4 +58,31 @@ impl FastRV {
             },
         }
     }
+
+    #[getter]
+    pub fn function(&self) -> Vec<Number> {
+        self.inner.function.clone()
+    }
+
+    #[getter]
+    pub fn support(&self) -> Vec<Number> {
+        self.inner.support.clone()
+    }
+
+    #[getter]
+    pub fn functional_form(&self) -> FunctionalForm {
+        self.inner.functional_form.clone()
+    }
+
+    #[getter]
+    pub fn domain_type(&self) -> DomainType {
+        self.inner.domain_type.clone()
+    }
+
+    #[pyo3(signature = (tolerance=None))]
+    pub fn verify_pdf(&self, tolerance: Option<f64>) -> bool {
+        self.inner
+            .verify_pdf(tolerance)
+            .expect("veriy_pdf method failed")
+    }
 }

@@ -36,7 +36,7 @@ pub struct RandomVariable {
 }
 
 impl RandomVariable {
-    fn verify_pdf(&self, tolerance: Option<f64>) -> Result<bool, String> {
+    pub fn verify_pdf(&self, tolerance: Option<f64>) -> Result<bool, String> {
         if self.functional_form != FunctionalForm::Pdf {
             return Err("verify_pdf only works for PDFs".to_string());
         }
