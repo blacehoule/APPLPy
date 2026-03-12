@@ -46,13 +46,15 @@ impl FastRV {
     fn new(
         function: Vec<Number>,
         support: Vec<Number>,
-        ftype: (FunctionalForm, DomainType),
+        functional_form: FunctionalForm,
+        domain_type: DomainType,
     ) -> Self {
         Self {
             inner: rv::RandomVariable {
                 function,
                 support,
-                ftype,
+                functional_form,
+                domain_type,
             },
         }
     }

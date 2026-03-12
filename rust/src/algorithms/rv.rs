@@ -31,12 +31,13 @@ pub enum DomainType {
 pub struct RandomVariable {
     pub function: Vec<Number>,
     pub support: Vec<Number>,
-    pub ftype: (FunctionalForm, DomainType),
+    pub functional_form: FunctionalForm,
+    pub domain_type: DomainType,
 }
 
 impl RandomVariable {
     fn verify_pdf(&self, tolerance: Option<f64>) -> Result<bool, String> {
-        if self.ftype.0 != FunctionalForm::Pdf {
+        if self.functional_form != FunctionalForm::Pdf {
             return Err("verify_pdf only works for PDFs".to_string());
         }
 
@@ -94,7 +95,8 @@ mod tests {
         let rv = RandomVariable {
             function: vec![Number::Float(1.0)],
             support: vec![Number::Float(1.0)],
-            ftype: (FunctionalForm::Cdf, DomainType::Continuous),
+            functional_form: FunctionalForm::Cdf,
+            domain_type: DomainType::Continuous,
         };
 
         let result = rv.verify_pdf(None);
@@ -106,7 +108,8 @@ mod tests {
         let rv = RandomVariable {
             function: vec![Number::Float(0.5), Number::Float(0.5)],
             support: vec![Number::Float(1.0), Number::Float(1.0)],
-            ftype: (FunctionalForm::Pdf, DomainType::Continuous),
+            functional_form: FunctionalForm::Pdf,
+            domain_type: DomainType::Continuous,
         };
 
         assert!(rv.verify_pdf(None).unwrap());
@@ -117,7 +120,8 @@ mod tests {
         let rv = RandomVariable {
             function: vec![Number::Float(0.5), Number::Float(0.49)],
             support: vec![Number::Float(1.0), Number::Float(1.0)],
-            ftype: (FunctionalForm::Pdf, DomainType::Continuous),
+            functional_form: FunctionalForm::Pdf,
+            domain_type: DomainType::Continuous,
         };
 
         assert!(!rv.verify_pdf(None).unwrap());
@@ -128,7 +132,8 @@ mod tests {
         let rv = RandomVariable {
             function: vec![Number::Float(0.5), Number::Float(0.49)],
             support: vec![Number::Float(1.0), Number::Float(1.0)],
-            ftype: (FunctionalForm::Pdf, DomainType::Continuous),
+            functional_form: FunctionalForm::Pdf,
+            domain_type: DomainType::Continuous,
         };
 
         assert!(rv.verify_pdf(Some(0.02)).unwrap());
@@ -142,7 +147,8 @@ mod tests {
                 Number::Rational(Rational64::new(1, 2)),
             ],
             support: vec![Number::Integer(1), Number::Integer(1)],
-            ftype: (FunctionalForm::Pdf, DomainType::Continuous),
+            functional_form: FunctionalForm::Pdf,
+            domain_type: DomainType::Continuous,
         };
 
         assert!(rv.verify_pdf(None).unwrap());
@@ -153,7 +159,8 @@ mod tests {
         let rv = RandomVariable {
             function: vec![Number::Float(-0.5), Number::Float(1.5)],
             support: vec![Number::Float(1.0), Number::Float(1.0)],
-            ftype: (FunctionalForm::Pdf, DomainType::Continuous),
+            functional_form: FunctionalForm::Pdf,
+            domain_type: DomainType::Continuous,
         };
         assert!(!rv.verify_pdf(None).unwrap());
     }
