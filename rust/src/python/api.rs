@@ -41,6 +41,14 @@ pub struct FastRV {
     inner: rv::RandomVariable,
 }
 
+fn format_number_list(values: &[Number]) -> String {
+    values
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 #[pymethods]
 impl FastRV {
     #[new]
@@ -87,6 +95,16 @@ impl FastRV {
             .expect("veriy_pdf method failed")
     }
 
+    pub fn __repr__(&self) -> String {
+        format!(
+            "FastRV(function=[{}], support=[{}], functional_form='{}', domain_type='{}')",
+            format_number_list(&self.inner.function),
+            format_number_list(&self.inner.support),
+            self.inner.functional_form,
+            self.inner.domain_type
+        )
+    }
+
     pub fn to_pdf(&self) -> PyResult<FastRV> {
         if let Ok(random_variable) = self.inner.to_pdf() {
             return Ok(FastRV {
@@ -109,5 +127,28 @@ impl FastRV {
         Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "converstion to cdf failed",
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use num_rational::Rational64;
+
+    #[test]
+    fn repr_is_python_style_and_stable() {
+        let rv = FastRV {
+            inner: rv::RandomVariable {
+                function: vec![Number::Rational(Rational64::new(1, 2)), Number::Integer(1)],
+                support: vec![Number::Integer(0), Number::Integer(1)],
+                functional_form: FunctionalForm::Pdf,
+                domain_type: DomainType::Discrete,
+            },
+        };
+
+        assert_eq!(
+            rv.__repr__(),
+            "FastRV(function=[1/2, 1], support=[0, 1], functional_form='pdf', domain_type='discrete')"
+        );
     }
 }

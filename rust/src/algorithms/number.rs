@@ -1,3 +1,4 @@
+use std::fmt;
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 
 use num_rational::Rational64;
@@ -47,6 +48,22 @@ impl Number {
 impl Default for Number {
     fn default() -> Self {
         Number::Integer(0)
+    }
+}
+
+impl fmt::Display for Number {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Number::Float(x) => write!(f, "{}", x),
+            Number::Integer(x) => write!(f, "{}", x),
+            Number::Rational(x) => {
+                if *x.denom() == 1 {
+                    write!(f, "{}", x.numer())
+                } else {
+                    write!(f, "{}/{}", x.numer(), x.denom())
+                }
+            }
+        }
     }
 }
 
@@ -142,5 +159,13 @@ mod tests {
         let mut value = Number::Integer(1);
         value += Number::Integer(2);
         assert!(matches!(value, Number::Integer(3)));
+    }
+
+    #[test]
+    fn display_formats_each_variant() {
+        assert_eq!(Number::Float(1.5).to_string(), "1.5");
+        assert_eq!(Number::Integer(7).to_string(), "7");
+        assert_eq!(Number::Rational(Rational64::new(3, 2)).to_string(), "3/2");
+        assert_eq!(Number::Rational(Rational64::new(4, 1)).to_string(), "4");
     }
 }
