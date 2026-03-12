@@ -4,6 +4,7 @@ pub mod algorithms;
 pub mod python;
 
 pub use algorithms::rv::Number;
+pub use python::api::FastRV;
 
 #[pyfunction]
 fn dummy_ping() -> &'static str {
@@ -16,7 +17,8 @@ fn applpy_rust(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(python::api::next_combination_py, module)?)?;
     module.add_function(wrap_pyfunction!(python::api::next_permutation_py, module)?)?;
 
-    // random variable class functions
+    // random variable class and related functions
+    module.add_class::<FastRV>()?;
     module.add_function(wrap_pyfunction!(
         python::api::verify_discrete_pdf_py,
         module

@@ -1,12 +1,10 @@
 use pyo3::conversion::FromPyObject;
 use pyo3::prelude::*;
-use pyo3::types::PyAny;
+use pyo3::types::{PyAny, PyModule};
 
-use crate::algorithms::rv::Number;
+use crate::algorithms::rv::{DomainType, FunctionalForm, Number};
 use num_rational::Rational64;
 
-/// Ensures Python lists that could contain floats, integers
-/// or rational numbers are correctly cast into the Number enum
 impl<'py> FromPyObject<'py> for Number {
     fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
         if let Ok(int) = obj.extract::<i64>() {
@@ -27,5 +25,89 @@ impl<'py> FromPyObject<'py> for Number {
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             "Expected int, float, or sympy.Rational",
         ))
+    }
+}
+
+impl IntoPy<PyObject> for Number {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        let s = match self {
+            Number::Float(f) => f.into_py(py),
+            Number::Integer(i) => i.into_py(py),
+            Number::Rational(r) => {
+                let sympy = PyModule::import_bound(py, "sympy").expect("unable to import sympy");
+
+                let rational = sympy
+                    .getattr("Rational")
+                    .expect("unable to import the Rational class from sympy");
+
+                let numerator: i64 = *r.numer();
+                let denominator: i64 = *r.denom();
+
+                rational
+                    .call1((numerator, denominator))
+                    .expect("unable to initialize sympy Rational number")
+                    .into_py(py)
+            }
+        };
+
+        s
+    }
+}
+
+impl<'py> FromPyObject<'py> for FunctionalForm {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let s: String = obj.extract()?;
+        match s.as_str() {
+            "cdf" => Ok(FunctionalForm::Cdf),
+            "chf" => Ok(FunctionalForm::Chf),
+            "hf" => Ok(FunctionalForm::Hf),
+            "idf" => Ok(FunctionalForm::Idf),
+            "pdf" => Ok(FunctionalForm::Pdf),
+            "sf" => Ok(FunctionalForm::Sf),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(
+                "Invalid FunctionalForm",
+            )),
+        }
+    }
+}
+
+impl IntoPy<PyObject> for FunctionalForm {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        let s = match self {
+            FunctionalForm::Cdf => "cdf",
+            FunctionalForm::Chf => "chf",
+            FunctionalForm::Hf => "hf",
+            FunctionalForm::Idf => "idf",
+            FunctionalForm::Pdf => "pdf",
+            FunctionalForm::Sf => "sf",
+        };
+
+        s.into_py(py)
+    }
+}
+
+impl<'py> FromPyObject<'py> for DomainType {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let s: String = obj.extract()?;
+        match s.as_str() {
+            "continuous" => Ok(DomainType::Continuous),
+            "discrete" => Ok(DomainType::Discrete),
+            "Discrete" => Ok(DomainType::DiscreteFunctional),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(
+                "Invalid DomainType",
+            )),
+        }
+    }
+}
+
+impl IntoPy<PyObject> for DomainType {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        let s = match self {
+            DomainType::Continuous => "continuous",
+            DomainType::Discrete => "discrete",
+            DomainType::DiscreteFunctional => "Discrete",
+        };
+
+        s.into_py(py)
     }
 }
