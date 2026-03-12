@@ -118,9 +118,9 @@ mod tests {
 
         let cdf = discrete_pdf_to_cdf(&rv).unwrap();
 
-        assert!(matches!(cdf.function[0], Number::Rational(x) if x == Rational64::new(1, 4)));
-        assert!(matches!(cdf.function[1], Number::Rational(x) if x == Rational64::new(1, 2)));
-        assert!(matches!(cdf.function[2], Number::Rational(x) if x == Rational64::new(1, 1)));
+        assert_eq!(cdf.function[0], Number::Rational(Rational64::new(1, 4)));
+        assert_eq!(cdf.function[1], Number::Rational(Rational64::new(1, 2)));
+        assert_eq!(cdf.function[2], Number::Rational(Rational64::new(1, 1)));
     }
 
     #[test]
@@ -154,9 +154,9 @@ mod tests {
         assert!(matches!(pdf.functional_form, FunctionalForm::Pdf));
         assert!(matches!(pdf.domain_type, DomainType::Discrete));
         assert_eq!(pdf.function.len(), 3);
-        assert!(matches!(pdf.function[0], Number::Rational(x) if x == Rational64::new(1, 10)));
-        assert!(matches!(pdf.function[1], Number::Rational(x) if x == Rational64::new(3, 10)));
-        assert!(matches!(pdf.function[2], Number::Rational(x) if x == Rational64::new(3, 5)));
+        assert_eq!(pdf.function[0], Number::Rational(Rational64::new(1, 10)));
+        assert_eq!(pdf.function[1], Number::Rational(Rational64::new(3, 10)));
+        assert_eq!(pdf.function[2], Number::Rational(Rational64::new(3, 5)));
 
         assert_eq!(pdf.support.len(), 3);
         assert!(matches!(pdf.support[0], Number::Integer(1)));
@@ -182,13 +182,7 @@ mod tests {
         let cdf = discrete_pdf_to_cdf(&rv).unwrap();
         let pdf = discrete_cdf_to_pdf(&cdf).unwrap();
 
-        assert_eq!(pdf.function.len(), original_pdf_function.len());
-        for (actual, expected) in pdf.function.iter().zip(original_pdf_function.iter()) {
-            assert!(matches!(
-                (*actual, *expected),
-                (Number::Rational(a), Number::Rational(b)) if a == b
-            ));
-        }
+        assert_eq!(pdf.function, original_pdf_function);
     }
 
     #[test]
@@ -209,12 +203,6 @@ mod tests {
         let pdf = discrete_cdf_to_pdf(&rv).unwrap();
         let cdf = discrete_pdf_to_cdf(&pdf).unwrap();
 
-        assert_eq!(cdf.function.len(), original_cdf_function.len());
-        for (actual, expected) in cdf.function.iter().zip(original_cdf_function.iter()) {
-            assert!(matches!(
-                (*actual, *expected),
-                (Number::Rational(a), Number::Rational(b)) if a == b
-            ));
-        }
+        assert_eq!(cdf.function, original_cdf_function);
     }
 }

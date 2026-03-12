@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use num_rational::Rational64;
 use num_traits::cast::ToPrimitive;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Number {
     Float(f64),
     Integer(i64),
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn mixed_addition_promotes_to_rational() {
         let result = Number::Integer(1) + Number::Rational(Rational64::new(1, 2));
-        assert!(matches!(result, Number::Rational(x) if x == Rational64::new(3, 2)));
+        assert_eq!(result, Number::Rational(Rational64::new(3, 2)));
     }
 
     #[test]
