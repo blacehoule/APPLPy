@@ -72,7 +72,7 @@ impl RandomVariable {
         match &self.functional_form {
             FunctionalForm::Cdf => conversion::discrete_cdf_to_pdf(self),
             FunctionalForm::Pdf => Ok(self.clone()),
-            FunctionalForm::Sf => {
+            FunctionalForm::Sf | FunctionalForm::Idf => {
                 let cdf_random_variable = self.to_cdf()?;
                 conversion::discrete_cdf_to_pdf(&cdf_random_variable)
             }
@@ -83,6 +83,7 @@ impl RandomVariable {
     pub fn to_cdf(&self) -> Result<RandomVariable, String> {
         match &self.functional_form {
             FunctionalForm::Cdf => Ok(self.clone()),
+            FunctionalForm::Idf => conversion::swap_discrete_cdf_and_idf(self),
             FunctionalForm::Pdf => conversion::discrete_pdf_to_cdf(self),
             FunctionalForm::Sf => conversion::swap_discrete_cdf_and_sf(self),
             functional_form => Err(format!("unable to convert {} to cdf", functional_form)),
@@ -92,12 +93,24 @@ impl RandomVariable {
     pub fn to_sf(&self) -> Result<RandomVariable, String> {
         match &self.functional_form {
             FunctionalForm::Cdf => conversion::swap_discrete_cdf_and_sf(self),
-            FunctionalForm::Pdf => {
+            FunctionalForm::Pdf | FunctionalForm::Idf => {
                 let cdf_random_variable = self.to_cdf()?;
                 conversion::swap_discrete_cdf_and_sf(&cdf_random_variable)
             }
             FunctionalForm::Sf => Ok(self.clone()),
             functional_form => Err(format!("unable to convert {} to sf", functional_form)),
+        }
+    }
+
+    pub fn to_idf(&self) -> Result<RandomVariable, String> {
+        match &self.functional_form {
+            FunctionalForm::Cdf => conversion::swap_discrete_cdf_and_idf(self),
+            FunctionalForm::Idf => Ok(self.clone()),
+            FunctionalForm::Pdf | FunctionalForm::Sf => {
+                let cdf_random_variable = self.to_cdf()?;
+                conversion::swap_discrete_cdf_and_idf(&cdf_random_variable)
+            }
+            functional_form => Err(format!("unable to convert {} to idf", functional_form)),
         }
     }
 }
