@@ -128,6 +128,18 @@ impl FastRV {
             "converstion to cdf failed",
         ))
     }
+
+    pub fn to_sf(&self) -> PyResult<FastRV> {
+        if let Ok(random_variable) = self.inner.to_sf() {
+            return Ok(FastRV {
+                inner: random_variable,
+            });
+        }
+
+        Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "converstion to sf failed",
+        ))
+    }
 }
 
 #[cfg(test)]
