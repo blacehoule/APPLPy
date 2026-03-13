@@ -6,5 +6,6 @@ MANIFEST
 APPLPy.egg-info/
 .coverage
 
+rust/target-local
 rust/target
 rust/.cargo-target

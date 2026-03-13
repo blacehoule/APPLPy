@@ -62,7 +62,9 @@ pub fn discrete_cdf_to_pdf(random_variable: &RandomVariable) -> Result<RandomVar
 }
 
 /// Converts between CDF and SF using the CDF = 1 - SF relatonship
-pub fn swap_cdf_and_sf(random_variable: &RandomVariable) -> Result<RandomVariable, String> {
+pub fn swap_discrete_cdf_and_sf(
+    random_variable: &RandomVariable,
+) -> Result<RandomVariable, String> {
     let original_function = &random_variable.function;
     let function_length = original_function.len();
 
@@ -73,7 +75,7 @@ pub fn swap_cdf_and_sf(random_variable: &RandomVariable) -> Result<RandomVariabl
     let functional_form = match &random_variable.functional_form {
         FunctionalForm::Cdf => Ok(FunctionalForm::Sf),
         FunctionalForm::Sf => Ok(FunctionalForm::Cdf),
-        _ => Err("swap_cdf_and_sf only works on cdf and sf functional forms".to_string()),
+        _ => Err("swap_discrete_cdf_and_sf only works on cdf and sf functional forms".to_string()),
     };
 
     let mut swapped_function = Vec::with_capacity(function_length);
@@ -86,6 +88,29 @@ pub fn swap_cdf_and_sf(random_variable: &RandomVariable) -> Result<RandomVariabl
         function: swapped_function,
         support: random_variable.support.clone(),
         functional_form: functional_form?,
+        domain_type: DomainType::Discrete,
+    };
+
+    Ok(swapped_random_variable)
+}
+
+/// Converts between the CDF and IDF funtional forms by swapping the function
+/// and support attributes
+pub fn swap_discrete_cdf_and_idf(
+    random_variable: &RandomVariable,
+) -> Result<RandomVariable, String> {
+    let original_function = &random_variable.function;
+    let original_support = &random_variable.support;
+
+    let function_length = original_function.len();
+    if function_length == 0 {
+        return Err("cannot swap cdf and idf. function is empty".to_string());
+    }
+
+    let swapped_random_variable = RandomVariable {
+        function: original_support.clone(),
+        support: original_function.clone(),
+        functional_form: FunctionalForm::Idf,
         domain_type: DomainType::Discrete,
     };
 
@@ -238,7 +263,7 @@ mod tests {
     }
 
     #[test]
-    fn swap_cdf_and_sf_returns_error_for_empty_function() {
+    fn swap_discrete_cdf_and_sf_returns_error_for_empty_function() {
         let rv = RandomVariable {
             function: vec![],
             support: vec![],
@@ -246,12 +271,12 @@ mod tests {
             domain_type: DomainType::Discrete,
         };
 
-        let result = swap_cdf_and_sf(&rv);
+        let result = swap_discrete_cdf_and_sf(&rv);
         assert!(matches!(result, Err(msg) if msg == "cannot swap cdf and sf. function is empty"));
     }
 
     #[test]
-    fn swap_cdf_and_sf_returns_error_for_non_cdf_sf_functional_form() {
+    fn swap_discrete_cdf_and_sf_returns_error_for_non_cdf_sf_functional_form() {
         let rv = RandomVariable {
             function: vec![Number::Float(0.1), Number::Float(0.3), Number::Float(0.6)],
             support: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
@@ -259,9 +284,9 @@ mod tests {
             domain_type: DomainType::Discrete,
         };
 
-        let result = swap_cdf_and_sf(&rv);
+        let result = swap_discrete_cdf_and_sf(&rv);
         assert!(
-            matches!(result, Err(msg) if msg == "swap_cdf_and_sf only works on cdf and sf functional forms")
+            matches!(result, Err(msg) if msg == "swap_discrete_cdf_and_sf only works on cdf and sf functional forms")
         );
     }
 
@@ -278,7 +303,7 @@ mod tests {
             domain_type: DomainType::Discrete,
         };
 
-        let swapped = swap_cdf_and_sf(&rv).unwrap();
+        let swapped = swap_discrete_cdf_and_sf(&rv).unwrap();
 
         assert!(matches!(swapped.functional_form, FunctionalForm::Sf));
         assert!(matches!(swapped.domain_type, DomainType::Discrete));
@@ -306,7 +331,7 @@ mod tests {
             domain_type: DomainType::Discrete,
         };
 
-        let swapped = swap_cdf_and_sf(&rv).unwrap();
+        let swapped = swap_discrete_cdf_and_sf(&rv).unwrap();
 
         assert!(matches!(swapped.functional_form, FunctionalForm::Cdf));
         assert!(matches!(swapped.domain_type, DomainType::Discrete));
@@ -322,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn swap_cdf_and_sf_twice_returns_original_random_variable() {
+    fn swap_discrete_cdf_and_sf_twice_returns_original_random_variable() {
         let original = RandomVariable {
             function: vec![
                 Number::Rational(Rational64::new(1, 10)),
@@ -334,8 +359,8 @@ mod tests {
             domain_type: DomainType::DiscreteFunctional,
         };
 
-        let swapped_once = swap_cdf_and_sf(&original).unwrap();
-        let swapped_twice = swap_cdf_and_sf(&swapped_once).unwrap();
+        let swapped_once = swap_discrete_cdf_and_sf(&original).unwrap();
+        let swapped_twice = swap_discrete_cdf_and_sf(&swapped_once).unwrap();
 
         assert_eq!(swapped_twice.function, original.function);
         assert_eq!(swapped_twice.support, original.support);
