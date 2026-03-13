@@ -487,4 +487,104 @@ mod tests {
         let result = rv.to_sf();
         assert!(matches!(result, Err(msg) if msg == "cannot compute the cdf. function is empty"));
     }
+
+    #[test]
+    fn to_idf_returns_clone_when_already_idf() {
+        let rv = RandomVariable {
+            function: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
+            support: vec![Number::Float(0.2), Number::Float(0.7), Number::Float(1.0)],
+            functional_form: FunctionalForm::Idf,
+            domain_type: DomainType::Discrete,
+        };
+
+        let result = rv.to_idf().unwrap();
+
+        assert_eq!(result.function, rv.function);
+        assert_eq!(result.support, rv.support);
+        assert!(matches!(result.functional_form, FunctionalForm::Idf));
+        assert!(matches!(result.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn to_idf_converts_cdf_to_idf() {
+        let rv = RandomVariable {
+            function: vec![Number::Float(0.2), Number::Float(0.7), Number::Float(1.0)],
+            support: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
+            functional_form: FunctionalForm::Cdf,
+            domain_type: DomainType::DiscreteFunctional,
+        };
+
+        let result = rv.to_idf().unwrap();
+
+        assert_eq!(result.function, rv.support);
+        assert_eq!(result.support, rv.function);
+        assert!(matches!(result.functional_form, FunctionalForm::Idf));
+        assert!(matches!(result.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn to_idf_converts_pdf_to_idf() {
+        let rv = RandomVariable {
+            function: vec![Number::Float(0.2), Number::Float(0.5), Number::Float(0.3)],
+            support: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
+            functional_form: FunctionalForm::Pdf,
+            domain_type: DomainType::DiscreteFunctional,
+        };
+
+        let result = rv.to_idf().unwrap();
+
+        assert_eq!(result.function, rv.support);
+        assert_eq!(
+            result.support,
+            vec![Number::Float(0.2), Number::Float(0.7), Number::Float(1.0)]
+        );
+        assert!(matches!(result.functional_form, FunctionalForm::Idf));
+        assert!(matches!(result.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn to_idf_converts_sf_to_idf() {
+        let rv = RandomVariable {
+            function: vec![Number::Float(1.0), Number::Float(0.7), Number::Float(0.3)],
+            support: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
+            functional_form: FunctionalForm::Sf,
+            domain_type: DomainType::DiscreteFunctional,
+        };
+
+        let result = rv.to_idf().unwrap();
+
+        assert_eq!(result.function, rv.support);
+        assert_eq!(
+            result.support,
+            vec![Number::Float(0.3), Number::Float(0.7), Number::Float(1.0)]
+        );
+        assert!(matches!(result.functional_form, FunctionalForm::Idf));
+        assert!(matches!(result.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn to_idf_returns_error_for_unsupported_functional_form() {
+        let rv = RandomVariable {
+            function: vec![Number::Float(0.2), Number::Float(0.8)],
+            support: vec![Number::Integer(1), Number::Integer(2)],
+            functional_form: FunctionalForm::Hf,
+            domain_type: DomainType::Discrete,
+        };
+
+        let result = rv.to_idf();
+        assert!(matches!(result, Err(msg) if msg == "unable to convert hf to idf"));
+    }
+
+    #[test]
+    fn to_idf_propagates_conversion_error_for_empty_pdf() {
+        let rv = RandomVariable {
+            function: vec![],
+            support: vec![],
+            functional_form: FunctionalForm::Pdf,
+            domain_type: DomainType::Discrete,
+        };
+
+        let result = rv.to_idf();
+        assert!(matches!(result, Err(msg) if msg == "cannot compute the cdf. function is empty"));
+    }
 }
