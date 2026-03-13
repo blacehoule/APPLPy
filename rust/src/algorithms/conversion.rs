@@ -62,7 +62,9 @@ pub fn discrete_cdf_to_pdf(random_variable: &RandomVariable) -> Result<RandomVar
 }
 
 /// Converts between CDF and SF using the CDF = 1 - SF relatonship
-pub fn swap_cdf_and_sf(random_variable: &RandomVariable) -> Result<RandomVariable, String> {
+pub fn swap_discrete_cdf_and_sf(
+    random_variable: &RandomVariable,
+) -> Result<RandomVariable, String> {
     let original_function = &random_variable.function;
     let function_length = original_function.len();
 
@@ -86,6 +88,29 @@ pub fn swap_cdf_and_sf(random_variable: &RandomVariable) -> Result<RandomVariabl
         function: swapped_function,
         support: random_variable.support.clone(),
         functional_form: functional_form?,
+        domain_type: DomainType::Discrete,
+    };
+
+    Ok(swapped_random_variable)
+}
+
+/// Converts between the CDF and IDF funtional forms by swapping the function
+/// and support attributes
+pub fn swap_discrete_cdf_and_idf(
+    random_variable: &RandomVariable,
+) -> Result<RandomVariable, String> {
+    let original_function = &random_variable.function;
+    let original_support = &random_variable.support;
+
+    let function_length = original_function.len();
+    if function_length == 0 {
+        return Err("cannot swap cdf and idf. function is empty".to_string());
+    }
+
+    let swapped_random_variable = RandomVariable {
+        function: original_support.clone(),
+        support: original_function.clone(),
+        functional_form: FunctionalForm::Idf,
         domain_type: DomainType::Discrete,
     };
 
