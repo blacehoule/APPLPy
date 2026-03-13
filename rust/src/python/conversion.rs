@@ -114,3 +114,87 @@ impl IntoPy<PyObject> for DomainType {
         s.into_py(py)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::algorithms::conversion::{swap_discrete_cdf_and_idf, swap_discrete_cdf_and_sf};
+    use crate::algorithms::rv::RandomVariable;
+    use num_rational::Rational64;
+
+    #[test]
+    fn swap_discrete_cdf_and_sf_reverses_function_and_toggles_form() {
+        let rv = RandomVariable {
+            function: vec![
+                Number::Rational(Rational64::new(1, 10)),
+                Number::Rational(Rational64::new(2, 5)),
+                Number::Rational(Rational64::new(1, 1)),
+            ],
+            support: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
+            functional_form: FunctionalForm::Cdf,
+            domain_type: DomainType::DiscreteFunctional,
+        };
+
+        let swapped = swap_discrete_cdf_and_sf(&rv).unwrap();
+
+        assert_eq!(
+            swapped.function,
+            vec![
+                Number::Rational(Rational64::new(1, 1)),
+                Number::Rational(Rational64::new(2, 5)),
+                Number::Rational(Rational64::new(1, 10)),
+            ]
+        );
+        assert_eq!(swapped.support, rv.support);
+        assert!(matches!(swapped.functional_form, FunctionalForm::Sf));
+        assert!(matches!(swapped.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn swap_discrete_cdf_and_sf_returns_error_for_non_cdf_or_sf_form() {
+        let rv = RandomVariable {
+            function: vec![Number::Float(0.1), Number::Float(0.9)],
+            support: vec![Number::Integer(1), Number::Integer(2)],
+            functional_form: FunctionalForm::Pdf,
+            domain_type: DomainType::Discrete,
+        };
+
+        let error = swap_discrete_cdf_and_sf(&rv).unwrap_err();
+        assert!(error.contains("only works on cdf and sf functional forms"));
+    }
+
+    #[test]
+    fn swap_discrete_cdf_and_idf_swaps_function_and_support() {
+        let rv = RandomVariable {
+            function: vec![
+                Number::Rational(Rational64::new(1, 4)),
+                Number::Rational(Rational64::new(3, 4)),
+                Number::Rational(Rational64::new(1, 1)),
+            ],
+            support: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
+            functional_form: FunctionalForm::Cdf,
+            domain_type: DomainType::DiscreteFunctional,
+        };
+
+        let swapped = swap_discrete_cdf_and_idf(&rv).unwrap();
+
+        assert_eq!(swapped.function, rv.support);
+        assert_eq!(swapped.support, rv.function);
+        assert!(matches!(swapped.functional_form, FunctionalForm::Idf));
+        assert!(matches!(swapped.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn swap_discrete_cdf_and_idf_returns_error_for_empty_function() {
+        let rv = RandomVariable {
+            function: vec![],
+            support: vec![],
+            functional_form: FunctionalForm::Cdf,
+            domain_type: DomainType::Discrete,
+        };
+
+        let result = swap_discrete_cdf_and_idf(&rv);
+
+        assert!(matches!(result, Err(msg) if msg == "cannot swap cdf and idf. function is empty"));
+    }
+}
