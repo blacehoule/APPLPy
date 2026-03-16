@@ -21,7 +21,7 @@ impl Number {
         }
     }
 
-    fn to_f64(self) -> f64 {
+    pub fn to_f64(self) -> f64 {
         match self {
             Number::Float(x) => x,
             Number::Integer(x) => x as f64,
@@ -42,6 +42,10 @@ impl Number {
 
             _ => (self, other),
         }
+    }
+
+    pub fn one() -> Number {
+        Number::Integer(1)
     }
 }
 
