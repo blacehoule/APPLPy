@@ -158,8 +158,10 @@ pub fn swap_discrete_cdf_and_sf(
     Ok(swapped_random_variable)
 }
 
-/// Converts between the CDF and IDF funtional forms by swapping the function
-/// and support attributes
+/// Converts between discrete CDF and IDF representations.
+///
+/// IDF is represented as quantiles in `function` and lower probability bounds
+/// in `support`.
 pub fn swap_discrete_cdf_and_idf(
     random_variable: &RandomVariable,
 ) -> Result<RandomVariable, String> {
@@ -167,25 +169,56 @@ pub fn swap_discrete_cdf_and_idf(
     let original_support = &random_variable.support;
     let original_functional_form = &random_variable.functional_form;
 
-    let swapped_functional_form = match original_functional_form {
-        FunctionalForm::Cdf => Ok(FunctionalForm::Idf),
-        FunctionalForm::Idf => Ok(FunctionalForm::Cdf),
-        _ => Err(
-            "swap_discrete_cdf_and_idf requires an input with the cdf or idf functional form"
-                .to_string(),
-        ),
-    };
-
     if original_function.is_empty() {
         return Err("cannot swap cdf and idf. function is empty".to_string());
     }
 
-    let swapped_random_variable = RandomVariable {
-        function: original_support.clone(),
-        support: original_function.clone(),
-        functional_form: swapped_functional_form?,
-        domain_type: DomainType::Discrete,
-    };
+    if original_function.len() != original_support.len() {
+        return Err(
+            "cannot swap cdf and idf. function and support must have the same length".to_string(),
+        );
+    }
+
+    let swapped_random_variable =
+        match original_functional_form {
+            // For discrete RVs, represent IDF as:
+            // support[p_i lower bounds] -> function[quantiles]
+            // where p_0 = 0 and p_i = F(x_{i-1}) for i > 0.
+            FunctionalForm::Cdf => {
+                let idf_support: Vec<Number> = std::iter::once(Number::default())
+                    .chain(
+                        original_function
+                            .iter()
+                            .take(original_function.len() - 1)
+                            .copied(),
+                    )
+                    .collect();
+
+                RandomVariable {
+                    function: original_support.clone(),
+                    support: idf_support,
+                    functional_form: FunctionalForm::Idf,
+                    domain_type: DomainType::Discrete,
+                }
+            }
+            // Convert IDF back into CDF using the stored lower probability bounds.
+            // This preserves the discrete step alignment used by SF conversions,
+            // so SF starts at 1 and remains non-increasing for valid IDFs.
+            FunctionalForm::Idf => {
+                let cdf_function = original_support.clone();
+
+                RandomVariable {
+                    function: cdf_function,
+                    support: original_function.clone(),
+                    functional_form: FunctionalForm::Cdf,
+                    domain_type: DomainType::Discrete,
+                }
+            }
+            _ => return Err(
+                "swap_discrete_cdf_and_idf requires an input with the cdf or idf functional form"
+                    .to_string(),
+            ),
+        };
 
     Ok(swapped_random_variable)
 }
@@ -233,7 +266,16 @@ pub fn discrete_chf_to_sf(random_variable: &RandomVariable) -> Result<RandomVari
     let sf_function: Vec<Number> = random_variable
         .function
         .iter()
-        .map(|value| Number::Float((-value.to_f64()).exp()))
+        .map(|value| {
+            let sf_value = (-value.to_f64()).exp();
+            if sf_value == 0.0 {
+                Number::Integer(0)
+            } else if sf_value == 1.0 {
+                Number::Integer(1)
+            } else {
+                Number::Float(sf_value)
+            }
+        })
         .collect();
 
     let sf_random_variable = RandomVariable {
@@ -593,6 +635,61 @@ mod tests {
     }
 
     #[test]
+    fn swap_discrete_cdf_and_idf_converts_cdf_to_inverse_cdf() {
+        let cdf = RandomVariable {
+            function: vec![Number::Float(0.2), Number::Float(0.7), Number::Float(1.0)],
+            support: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
+            functional_form: FunctionalForm::Cdf,
+            domain_type: DomainType::DiscreteFunctional,
+        };
+
+        let idf = swap_discrete_cdf_and_idf(&cdf).unwrap();
+
+        assert_eq!(idf.function, cdf.support);
+        assert_eq!(
+            idf.support,
+            vec![Number::Integer(0), Number::Float(0.2), Number::Float(0.7)]
+        );
+        assert!(matches!(idf.functional_form, FunctionalForm::Idf));
+        assert!(matches!(idf.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn swap_discrete_cdf_and_idf_converts_inverse_cdf_to_cdf() {
+        let idf = RandomVariable {
+            function: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
+            support: vec![Number::Integer(0), Number::Float(0.2), Number::Float(0.7)],
+            functional_form: FunctionalForm::Idf,
+            domain_type: DomainType::Discrete,
+        };
+
+        let cdf = swap_discrete_cdf_and_idf(&idf).unwrap();
+
+        assert_eq!(
+            cdf.function,
+            vec![Number::Integer(0), Number::Float(0.2), Number::Float(0.7)]
+        );
+        assert_eq!(cdf.support, idf.function);
+        assert!(matches!(cdf.functional_form, FunctionalForm::Cdf));
+        assert!(matches!(cdf.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn swap_discrete_cdf_and_idf_returns_error_for_mismatched_lengths() {
+        let rv = RandomVariable {
+            function: vec![Number::Float(0.2), Number::Float(1.0)],
+            support: vec![Number::Integer(1)],
+            functional_form: FunctionalForm::Cdf,
+            domain_type: DomainType::Discrete,
+        };
+
+        let result = swap_discrete_cdf_and_idf(&rv);
+        assert!(
+            matches!(result, Err(msg) if msg == "cannot swap cdf and idf. function and support must have the same length")
+        );
+    }
+
+    #[test]
     fn swap_cdf_to_sf_complements_function_and_sets_metadata() {
         let rv = RandomVariable {
             function: vec![
@@ -754,8 +851,21 @@ mod tests {
         assert!(matches!(sf.domain_type, DomainType::Discrete));
         assert_eq!(sf.support, rv.support);
         assert_eq!(sf.function.len(), 3);
-        assert!(matches!(sf.function[0], Number::Float(x) if (x - 1.0).abs() < 1e-12));
+        assert!(matches!(sf.function[0], Number::Integer(1)));
         assert!(matches!(sf.function[1], Number::Float(x) if (x - (-1.0f64).exp()).abs() < 1e-12));
         assert!(matches!(sf.function[2], Number::Float(x) if (x - (-2.0f64).exp()).abs() < 1e-12));
+    }
+
+    #[test]
+    fn discrete_chf_to_sf_maps_positive_infinity_to_exact_zero() {
+        let rv = RandomVariable {
+            function: vec![Number::Float(f64::INFINITY)],
+            support: vec![Number::Integer(1)],
+            functional_form: FunctionalForm::Chf,
+            domain_type: DomainType::Discrete,
+        };
+
+        let sf = discrete_chf_to_sf(&rv).unwrap();
+        assert_eq!(sf.function, vec![Number::Integer(0)]);
     }
 }

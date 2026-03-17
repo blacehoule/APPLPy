@@ -139,7 +139,7 @@ impl RandomVariable {
             FunctionalForm::Cdf => conversion::swap_discrete_cdf_and_idf(self),
             FunctionalForm::Chf | FunctionalForm::Hf => {
                 let cdf_random_variable = self.to_cdf()?;
-                cdf_random_variable.to_chf()
+                cdf_random_variable.to_idf()
             }
             FunctionalForm::Idf => Ok(self.clone()),
             FunctionalForm::Pdf | FunctionalForm::Sf => {
@@ -485,6 +485,26 @@ mod tests {
     }
 
     #[test]
+    fn to_sf_converts_idf_to_sf_starting_at_one_and_non_increasing() {
+        let rv = RandomVariable {
+            function: vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)],
+            support: vec![Number::Integer(0), Number::Float(0.2), Number::Float(0.7)],
+            functional_form: FunctionalForm::Idf,
+            domain_type: DomainType::DiscreteFunctional,
+        };
+
+        let result = rv.to_sf().unwrap();
+
+        assert_eq!(result.function.len(), 3);
+        assert_eq!(result.function[0], Number::Integer(1));
+        let values: Vec<f64> = result.function.iter().map(|value| value.to_f64()).collect();
+        assert!(values.windows(2).all(|window| window[0] >= window[1]));
+        assert_eq!(result.support, rv.function);
+        assert!(matches!(result.functional_form, FunctionalForm::Sf));
+        assert!(matches!(result.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
     fn to_sf_propagates_conversion_error_for_empty_pdf() {
         let rv = RandomVariable {
             function: vec![],
@@ -526,7 +546,10 @@ mod tests {
         let result = rv.to_idf().unwrap();
 
         assert_eq!(result.function, rv.support);
-        assert_eq!(result.support, rv.function);
+        assert_eq!(
+            result.support,
+            vec![Number::Integer(0), Number::Float(0.2), Number::Float(0.7)]
+        );
         assert!(matches!(result.functional_form, FunctionalForm::Idf));
         assert!(matches!(result.domain_type, DomainType::Discrete));
     }
@@ -545,7 +568,7 @@ mod tests {
         assert_eq!(result.function, rv.support);
         assert_eq!(
             result.support,
-            vec![Number::Float(0.2), Number::Float(0.7), Number::Float(1.0)]
+            vec![Number::Integer(0), Number::Float(0.2), Number::Float(0.7)]
         );
         assert!(matches!(result.functional_form, FunctionalForm::Idf));
         assert!(matches!(result.domain_type, DomainType::Discrete));
@@ -564,9 +587,9 @@ mod tests {
 
         assert_eq!(result.function, rv.support);
         assert_eq!(result.support.len(), 3);
-        assert!(matches!(result.support[0], Number::Float(x) if (x - 0.0).abs() < 1e-12));
-        assert!(matches!(result.support[1], Number::Float(x) if (x - 0.3).abs() < 1e-12));
-        assert!(matches!(result.support[2], Number::Float(x) if (x - 0.7).abs() < 1e-12));
+        assert!(matches!(result.support[0], Number::Integer(0)));
+        assert!(matches!(result.support[1], Number::Float(x) if (x - 0.0).abs() < 1e-12));
+        assert!(matches!(result.support[2], Number::Float(x) if (x - 0.3).abs() < 1e-12));
         assert!(matches!(result.functional_form, FunctionalForm::Idf));
         assert!(matches!(result.domain_type, DomainType::Discrete));
     }
