@@ -68,6 +68,10 @@ impl RandomVariable {
         verify_pdf(&self.function, tolerance)
     }
 
+    pub fn evaluate(&self, value: Number) -> Option<Number> {
+        evaluate_rv(&self.function, &self.support, value)
+    }
+
     pub fn to_pdf(&self) -> Result<RandomVariable, String> {
         match &self.functional_form {
             FunctionalForm::Cdf => conversion::discrete_cdf_to_pdf(self),
@@ -189,6 +193,27 @@ pub fn verify_pdf(function: &[Number], tolerance: Option<f64>) -> Result<bool, S
     }
 
     Ok((area > 1.0 - tolerance) && (area < 1.0 + tolerance))
+}
+
+/// Evaluates a random variable at a specific value. Used to compute F(x) for
+/// the random variable
+///
+/// # Arguments
+/// * `function` - the probability mass functon of the RV
+/// * `support` - the support of the RV
+/// * `value` - the value at which to evaulate the function
+///
+/// # Returns
+/// * `output` - a Number representing F(x) at the
+pub fn evaluate_rv(function: &[Number], support: &[Number], value: Number) -> Option<Number> {
+    for (support_window, &function_value) in support.windows(2).zip(function.iter()) {
+        let (current_support, next_support) = (support_window[0], support_window[1]);
+        if current_support <= value && next_support > value {
+            return Some(function_value);
+        }
+    }
+
+    function.last().copied()
 }
 
 #[cfg(test)]
@@ -674,5 +699,52 @@ mod tests {
 
         let result = rv.to_idf();
         assert!(matches!(result, Err(msg) if msg == "cannot compute the cdf. function is empty"));
+    }
+
+    #[test]
+    fn evaluate_rv_returns_interval_value_for_interior_point() {
+        let function = vec![Number::Float(0.1), Number::Float(0.4), Number::Float(0.9)];
+        let support = vec![Number::Integer(1), Number::Integer(3), Number::Integer(5)];
+
+        let result = evaluate_rv(&function, &support, Number::Integer(2));
+        assert_eq!(result, Some(Number::Float(0.1)));
+    }
+
+    #[test]
+    fn evaluate_rv_returns_value_for_exact_support_point() {
+        let function = vec![
+            Number::Integer(10),
+            Number::Integer(20),
+            Number::Integer(30),
+        ];
+        let support = vec![Number::Integer(1), Number::Integer(3), Number::Integer(5)];
+
+        let result = evaluate_rv(&function, &support, Number::Integer(3));
+        assert_eq!(result, Some(Number::Integer(20)));
+    }
+
+    #[test]
+    fn evaluate_rv_returns_last_value_for_points_outside_support_range() {
+        let function = vec![
+            Number::Integer(10),
+            Number::Integer(20),
+            Number::Integer(30),
+        ];
+        let support = vec![Number::Integer(1), Number::Integer(3), Number::Integer(5)];
+
+        let below_min = evaluate_rv(&function, &support, Number::Integer(0));
+        let above_max = evaluate_rv(&function, &support, Number::Integer(9));
+
+        assert_eq!(below_min, Some(Number::Integer(30)));
+        assert_eq!(above_max, Some(Number::Integer(30)));
+    }
+
+    #[test]
+    fn evaluate_rv_returns_none_for_empty_function() {
+        let function: Vec<Number> = vec![];
+        let support = vec![Number::Integer(1), Number::Integer(2)];
+
+        let result = evaluate_rv(&function, &support, Number::Integer(1));
+        assert_eq!(result, None);
     }
 }
