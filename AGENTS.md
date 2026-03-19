@@ -13,6 +13,8 @@ This section should contain instructions for how to validate the changes in the 
 ```
 
 Each pull request should have a title that uses conventional commit format.
+The pull request description should the full diff between the feature branch
+and the `main` branch, and should look at both the commit messages and the code changes.
 
 ## Testing
 
@@ -22,6 +24,9 @@ is running as expected:
 - `make cargo-lint`: runs `cargo clippy` and `cargo fmt --check` linting.
     If `cargo fmt --check` fails, run `make cargo-tidy` to format the code
 - `make cargo-test`: runs the unit tests for the rust code
+
+For rust tests, include doc string tests for basic examples and a test module for more complex
+examples.
 
 If you modify the python code, run the following commands to confirm everything is running
 as expected:

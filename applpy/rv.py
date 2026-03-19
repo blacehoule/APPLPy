@@ -8,55 +8,53 @@ Main Random Variable Module
 5. Plots
 
 Class Procedures:
-    1. display()
-    1. verify_pdf()
-    2. variate(n)
+    display()
+    verify_pdf()
+    variate(n)
 
 Functional Form Conversion:
-    1. CDF(random_variable,value)
-    2. CHF(random_variable,value)
-    3. HF(random_variable,value)
-    4. IDF(random_variable,value)
-    5. PDF(random_variable,value)
-    6. SF(random_variable,value)
-    7. BootstrapRV(varlist)
-    8. Convert(random_variable,inc)
+    CDF(random_variable,value)
+    CHF(random_variable,value)
+    HF(random_variable,value)
+    IDF(random_variable,value)
+    PDF(random_variable,value)
+    SF(random_variable,value)
+    BootstrapRV(varlist)
+    Convert(random_variable,inc)
 
 Procedures On One Random Variable:
-    1. ConvolutionIID(random_variable,n)
-    2. CoefOfVar(random_variable)
-    3. ExpectedValue(random_variable,gX)
-    4. Entropy(random_variable)
-    5. Kurtosis(random_variable)
-    6. MaximumIID(random_variable,n)
-    7. Mean(random_variable)
-    8. MeanDiscrete(random_variable)
-    9. MGF(random_variable)
-    10. MinimumIID(random_variable,n)
-    11. OrderStat(random_variable,n,r)
-    12. ProductIID(random_variable,n)
-    13. RangeStat(random_variable,n)
-    14. Skewness(random_variable)
-    15. Transform(random_variable,gX)
-    16. Truncate(random_variable,[lw,up])
-    17. Variance(random_variable)
-    18. VarDiscrete(random_variable)
-    19. VerifyPDF(random_variable)
+    ConvolutionIID(random_variable,n)
+    CoefOfVar(random_variable)
+    ExpectedValue(random_variable,gX)
+    Entropy(random_variable)
+    Kurtosis(random_variable)
+    MaximumIID(random_variable,n)
+    Mean(random_variable)
+    MGF(random_variable)
+    MinimumIID(random_variable,n)
+    OrderStat(random_variable,n,r)
+    ProductIID(random_variable,n)
+    RangeStat(random_variable,n)
+    Skewness(random_variable)
+    Transform(random_variable,gX)
+    Truncate(random_variable,[lw,up])
+    Variance(random_variable)
+    VerifyPDF(random_variable)
 
 Procedures On Two Random Variables:
-    1. Convolution(random_variable_1,random_variable_2)
-    2. Maximum(random_variable_1,random_variable_2)
-    3. Minimum(random_variable_1,random_variable_2)
-    4. Mixture(MixParameters,MixRVs)
-    5. Product(random_variable_1,random_variable_2)
+    Convolution(random_variable_1,random_variable_2)
+    Maximum(random_variable_1,random_variable_2)
+    Minimum(random_variable_1,random_variable_2)
+    Mixture(MixParameters,MixRVs)
+    Product(random_variable_1,random_variable_2)
 
 Plotting Procedures:
-    1. Histogram(sample,bins)
-    2. PlotDist(random_variable,suplist)
-    3. PlotDisplay(plot_list,suplist)
-    4. PlotEmpCDF(data)
-    5. PPPlot(random_variable,sample)
-    6. QQPlot(random_variable,sample)
+    Histogram(sample,bins)
+    PlotDist(random_variable,suplist)
+    PlotDisplay(plot_list,suplist)
+    PlotEmpCDF(data)
+    PPPlot(random_variable,sample)
+    QQPlot(random_variable,sample)
 """
 
 from applpy import rust_bindings
@@ -96,23 +94,21 @@ import matplotlib.pylab as plt
 
 x, y, z, t = symbols("x y z t")
 
-"""
-    A Probability Progamming Language (APPL) -- Python Edition
-    Copyright (C) 2001,2002,2008,2010,2014 Andrew Glen, Larry
-    Leemis, Diane Evans, Matthew Robinson
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        https://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-"""
+# A Probability Progamming Language (APPL) -- Python Edition
+# Copyright (C) 2001,2002,2008,2010,2014 Andrew Glen, Larry
+# Leemis, Diane Evans, Matthew Robinson
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 class RVError(Exception):
@@ -261,27 +257,6 @@ class RV:
         domain_type, functional_form = self._parse_ftype(ftype)
         self.domain_type = domain_type
         self.functional_form = functional_form
-
-    """
-    Special Class Methods
-
-    Procedures:
-        1. __repr__(self)
-        2. __len__(self)
-        3. __pos__(self)
-        4. __neg__(self)
-        5. __abs__(self)
-        6. __add__(self,other)
-        7. __radd__(self,other)
-        8. __sub__(self,other)
-        9. __rsub__(self,other)
-        10. __mul__(self,other)
-        11. __rmul__(self,other)
-        12. __truediv__(self,other)
-        13. __rtruediv__(self,other)
-        14. __pow__(self,n)
-        15. __eq__(self,other)
-    """
 
     def __repr__(self):
         """
@@ -560,22 +535,6 @@ class RV:
                 return False
         # If all of the segments simplify to zero, return True
         return True
-
-    """
-    Utility Methods
-
-    Procedures:
-        1. add_assumptions(self,option)
-        2. add_to_cache(self,object_name,object)
-        3. display(self)
-        4. drop_assumptions(self)
-        5. init_cache(self)
-        6. latex(self)
-        7. save(self,filename)
-        8. simplify(self,assumption)
-        9. verify_pdf(self)
-        10. variate(self,n)
-    """
 
     def add_assumptions(self, option):
         """
@@ -953,17 +912,15 @@ class RV:
         return varlist
 
 
-"""
-Conversion Procedures:
-    1. CDF(random_variable,value)
-    2. CHF(random_variable,value)
-    3. HF(random_variable,value)
-    4. IDF(random_variable,value)
-    5. PDF(random_variable,value)
-    6. SF(random_variable,value)
-    7. BootstrapRV(varlist)
-    8. Convert(random_variable,inc)
-"""
+# Conversion Procedures:
+#     CDF(random_variable,value)
+#     CHF(random_variable,value)
+#     HF(random_variable,value)
+#     IDF(random_variable,value)
+#     PDF(random_variable,value)
+#     SF(random_variable,value)
+#     BootstrapRV(varlist)
+#     Convert(random_variable,inc)
 
 
 def check_value(value, sup):
@@ -2066,30 +2023,26 @@ def Convert(random_variable, inc=1):
     return RV(discrete_func, discrete_supp, ["discrete", random_variable.functional_form])
 
 
-"""
-Procedures on One Random Variable
-
-Procedures:
-    1. ConvolutionIID(random_variable,n)
-    2. CoefOfVar(random_variable)
-    3. ExpectedValue(random_variable,gX)
-    4. Entropy(random_variable)
-    5. Kurtosis(random_variable)
-    6. MaximumIID(random_variable,n)
-    7. Mean(random_variable)
-    8. MeanDiscrete(random_variable)
-    9. MGF(random_variable)
-    10. MinimumIID(random_variable,n)
-    11. OrderStat(random_variable,n,r)
-    12. Power(Rvar,n)
-    13. ProductIID(random_variable,n)
-    14. Skewness(random_variable)
-    15. SqRt(random_variable)
-    16. Transform(random_variable,gX)
-    17. Truncate(random_variable,[lw,up])
-    18. Variance(random_variable)
-    19. VarDiscrete(random_variable)
-"""
+# Procedures on One Random Variable
+#
+# Procedures:
+#     ConvolutionIID(random_variable,n)
+#     CoefOfVar(random_variable)
+#     ExpectedValue(random_variable,gX)
+#     Entropy(random_variable)
+#     Kurtosis(random_variable)
+#     MaximumIID(random_variable,n)
+#     Mean(random_variable)
+#     MGF(random_variable)
+#     MinimumIID(random_variable,n)
+#     OrderStat(random_variable,n,r)
+#     Power(Rvar,n)
+#     ProductIID(random_variable,n)
+#     Skewness(random_variable)
+#     SqRt(random_variable)
+#     Transform(random_variable,gX)
+#     Truncate(random_variable,[lw,up])
+#     Variance(random_variable)
 
 
 def ConvolutionIID(random_variable, n):
@@ -2172,21 +2125,15 @@ def ExpectedValue(random_variable, gX=x):
             Expect += summation(gX * fx.func[i], (x, fx.support[i], fx.support[i + 1]))
         return simplify(Expect)
 
-    # If the distribution is discrete, compute the expected
-    #   value
     if fx.domain_type == "discrete":
-        # Transform the random variable, and then use the
-        #   mean procedure to find the expected value
         fx_support = [gX.subs(x, value) for value in fx.support]
-        fx_trans = RV(
-            fx.func,
-            fx_support,
+        fx_trans = FastRV(
+            function=fx.func,
+            support=fx_support,
             functional_form=fx.functional_form,
             domain_type=fx.domain_type,
         )
-        # fx_trans=Transform(fx,[[gX],[-oo,oo]])
-        Expect = MeanDiscrete(fx_trans)
-        return simplify(Expect)
+        return fx_trans.mean()
 
 
 def Entropy(random_variable, cache=False):
@@ -2329,58 +2276,13 @@ def Mean(random_variable, cache=False):
 
     # If the random variable is discrete, find and return the variance
     if X_dummy.domain_type == "discrete":
-        meanval = MeanDiscrete(random_variable)
-        if cache:
-            random_variable.add_to_cache("mean", meanval)
-        return simplify(meanval)
-        #
-        # Legacy mean code ... update uses faster numpy implementation
-        #
-        # Create a list of x*f(x)
-        # meanlist=[]
-        # for i in range(len(X_dummy.func)):
-        #    meanlist.append(X_dummy.func[i]*X_dummy.support[i])
-        # Sum to find the mean
-        # meanval=0
-        # for i in range(len(meanlist)):
-        #    meanval+=meanlist[i]
-        # return simplify(meanval)
-
-
-def MeanDiscrete(random_variable):
-    """
-    Procedure Name: MeanDiscrete
-    Purpose: Compute the mean of a discrete random variable
-    Arguments:  1. random_variable: A discrete random variable
-    Output:     1. The mean of the random variable
-    """
-    # Check the random variable to make sure it is discrete
-    if random_variable.domain_type == "continuous":
-        raise RVError("the random variable must be continuous")
-    elif random_variable.domain_type == "discrete_functional":
-        try:
-            random_variable = Convert(random_variable)
-        except Exception:
-            err_string = "the support of the random variable"
-            err_string += " must be finite"
-            raise RVError(err_string)
-    elif random_variable.domain_type == "discrete" and random_variable.functional_form == "pdf":
-        # Preserve symbolic transformed supports (e.g., exp(t*x) in MGF) by
-        # avoiding conversion through FastRV, which requires numeric supports.
-        support = np.asarray(random_variable.support, dtype=object)
-        pdf = np.asarray(random_variable.func, dtype=object)
-        return np.multiply(support, pdf).sum()
-    # Convert the random variable to PDF form
-    X_dummy = PDF(random_variable)
-    # Convert support and pdf values to numpy arrays
-    support = np.asarray(X_dummy.support, dtype=object)
-    pdf = np.asarray(X_dummy.func, dtype=object)
-    # Use the numpy element wise multiplication function to
-    #   determine a vector of the values of f(x)*x
-    vals = np.multiply(support, pdf)
-    # Sum the values of f(x)*x to find the mean
-    meanval = vals.sum()
-    return meanval
+        fast_rv = FastRV(
+            function=random_variable.func,
+            support=random_variable.support,
+            functional_form=random_variable.functional_form,
+            domain_type="discrete",
+        )
+        return fast_rv.mean()
 
 
 def MGF(random_variable, cache=False):
@@ -3268,10 +3170,14 @@ def VarDiscrete(random_variable):
             err_string = "the support of the random variable"
             err_string += " must be finite"
             raise RVError(err_string)
-    # Convert the random variable to PDF form
-    PDF(random_variable)
-    # Mind the mean of the random variable
-    EX = MeanDiscrete(random_variable)
+
+    fast_rv = FastRV(
+        function=random_variable.func,
+        support=random_variable.support,
+        functional_form=random_variable.functional_form,
+        domain_type=random_variable.domain_type,
+    )
+    EX = fast_rv.mean()
     # Convert the values and support of the random variable
     #   to vector form
     support = np.asarray(random_variable.support, dtype=object)
@@ -3297,16 +3203,14 @@ def VerifyPDF(random_variable):
     return random_variable.verify_pdf()
 
 
-"""
-Procedures on Two Random Variables
-
-Procedures:
-    1. Convolution(random_variable_1,random_variable_2)
-    2. Maximum(random_variable_1,random_variable_2)
-    3. Minimum(random_variable_1,random_variable_2)
-    4. Mixture(MixParameters,MixRVs)
-    5. Product(random_variable_1,random_variable_2)
-"""
+# Procedures on Two Random Variables
+#
+# Procedures:
+#     Convolution(random_variable_1,random_variable_2)
+#     Maximum(random_variable_1,random_variable_2)
+#     Minimum(random_variable_1,random_variable_2)
+#     Mixture(MixParameters,MixRVs)
+#     Product(random_variable_1,random_variable_2)
 
 
 def Convolution(random_variable_1, random_variable_2):
@@ -4255,20 +4159,18 @@ def ProductDiscrete(random_variable_1, random_variable_2):
     return RV(funclist3, prodlist3, ["discrete", "pdf"])
 
 
-"""
-Utilities
-
-Procedures:
-    1. Histogram(sample,bins)
-    2. LoadRV(filename)
-    3. PlotClear()
-    4. PlotDist(random_variable,suplist)
-    5. PlotDisplay(plot_list,suplist)
-    6. PlotEmpCDF(data)
-    7. PlotLimits(limits, axis)
-    8. PPPlot(random_variable,sample)
-    9. QQPlot(random_variable,sample)
-"""
+# Utilities
+#
+# Procedures:
+#     Histogram(sample,bins)
+#     LoadRV(filename)
+#     PlotClear()
+#     PlotDist(random_variable,suplist)
+#     PlotDisplay(plot_list,suplist)
+#     PlotEmpCDF(data)
+#     PlotLimits(limits, axis)
+#     PPPlot(random_variable,sample)
+#     QQPlot(random_variable,sample)
 
 
 def Histogram(sample, Bins=None):
