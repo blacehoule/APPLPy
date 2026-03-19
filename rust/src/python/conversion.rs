@@ -3,13 +3,40 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
 use crate::algorithms::number::Number;
-use crate::algorithms::rv::{DomainType, FunctionalForm};
+use crate::algorithms::order_stat::OrderStatVariant;
+use crate::algorithms::rv::{DomainType, FunctionalForm, RandomVariable};
+use crate::python::api::FastRV;
 use num_rational::Rational64;
+
+impl<'py> FromPyObject<'py> for FastRV {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let function = obj.getattr("func")?;
+        let support = obj.getattr("support")?;
+        let functional_form = obj.getattr("functional_form")?;
+        let domain_type = obj.getattr("domain_type")?;
+
+        let random_variable = RandomVariable {
+            function: function.extract()?,
+            support: support.extract()?,
+            functional_form: functional_form.extract()?,
+            domain_type: domain_type.extract()?,
+        };
+
+        let fast_rv = FastRV::new(
+            random_variable.function,
+            random_variable.support,
+            random_variable.functional_form,
+            random_variable.domain_type,
+        );
+
+        Ok(fast_rv)
+    }
+}
 
 impl<'py> FromPyObject<'py> for Number {
     fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
         // the p and q attributes are associated with the sympy Rtaional class
-        if obj.hasattr("p")? & obj.hasattr("q")? {
+        if obj.hasattr("p")? && obj.hasattr("q")? {
             let numerator: i64 = obj.getattr("p")?.extract()?;
             let denominator: i64 = obj.getattr("q")?.extract()?;
             if denominator == 0 {
@@ -48,7 +75,7 @@ impl<'py> FromPyObject<'py> for Number {
 
 impl IntoPy<PyObject> for Number {
     fn into_py(self, py: Python<'_>) -> PyObject {
-        let s = match self {
+        match self {
             Number::Rational(r) => {
                 let sympy = PyModule::import_bound(py, "sympy").expect("unable to import sympy");
 
@@ -87,9 +114,7 @@ impl IntoPy<PyObject> for Number {
                     .into_py(py)
             }
             Number::Integer(i) => i.into_py(py),
-        };
-
-        s
+        }
     }
 }
 
@@ -147,6 +172,30 @@ impl IntoPy<PyObject> for DomainType {
             DomainType::Continuous => "continuous",
             DomainType::Discrete => "discrete",
             DomainType::DiscreteFunctional => "discrete_functional",
+        };
+
+        s.into_py(py)
+    }
+}
+
+impl<'py> FromPyObject<'py> for OrderStatVariant {
+    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let s: String = obj.extract()?;
+        match s.as_str() {
+            "wo" => Ok(OrderStatVariant::WithoutReplacement),
+            "w" => Ok(OrderStatVariant::WithReplacement),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(
+                "Invalid OrderStatVariant",
+            )),
+        }
+    }
+}
+
+impl IntoPy<PyObject> for OrderStatVariant {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        let s = match self {
+            OrderStatVariant::WithoutReplacement => "wo",
+            OrderStatVariant::WithReplacement => "w",
         };
 
         s.into_py(py)

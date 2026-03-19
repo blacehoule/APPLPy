@@ -3,11 +3,44 @@
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyAny;
 
 use crate::algorithms::number::Number;
 use crate::algorithms::order_stat;
 use crate::algorithms::rv;
-use crate::algorithms::rv::{DomainType, FunctionalForm};
+use crate::algorithms::rv::{DomainType, FunctionalForm, RandomVariable};
+
+#[pyfunction(name = "discrete_order_stat", signature = (random_variable, n, r, replace="w"))]
+pub fn discrete_order_stat_py(
+    random_variable: &Bound<'_, PyAny>,
+    n: u64,
+    r: u64,
+    replace: &str,
+) -> PyResult<FastRV> {
+    let random_variable: FastRV = random_variable.extract()?;
+
+    let variant = match replace {
+        "w" => order_stat::OrderStatVariant::WithReplacement,
+        "wo" => order_stat::OrderStatVariant::WithoutReplacement,
+        _ => {
+            return Err(PyValueError::new_err(
+                "Invalid OrderStatVariant: expected 'w' or 'wo'",
+            ));
+        }
+    };
+
+    let order_stat_rv = order_stat::discrete_order_stat(&random_variable.inner, n, r, variant)
+        .map_err(PyValueError::new_err)?;
+
+    let fast_rv = FastRV::new(
+        order_stat_rv.function,
+        order_stat_rv.support,
+        order_stat_rv.functional_form,
+        order_stat_rv.domain_type,
+    );
+
+    Ok(fast_rv)
+}
 
 #[pyfunction(name = "next_combination", signature = (previous, n))]
 pub fn next_combination_py(previous: Vec<usize>, n: usize) -> PyResult<Option<Vec<usize>>> {
@@ -38,7 +71,7 @@ pub fn verify_discrete_pdf_py(function: Vec<Number>, tolerance: Option<f64>) -> 
 
 #[pyclass]
 pub struct FastRV {
-    inner: rv::RandomVariable,
+    inner: RandomVariable,
 }
 
 fn format_number_list(values: &[Number]) -> String {
@@ -52,7 +85,7 @@ fn format_number_list(values: &[Number]) -> String {
 #[pymethods]
 impl FastRV {
     #[new]
-    fn new(
+    pub fn new(
         function: Vec<Number>,
         support: Vec<Number>,
         functional_form: FunctionalForm,
