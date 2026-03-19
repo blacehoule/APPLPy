@@ -7,38 +7,16 @@ Main Random Variable Module
 4. Operations on two random variables
 5. Plots
 
-Class Procedures:
-    display()
-    verify_pdf()
-    variate(n)
-
-Functional Form Conversion:
-    CDF(random_variable,value)
-    CHF(random_variable,value)
-    HF(random_variable,value)
-    IDF(random_variable,value)
-    PDF(random_variable,value)
-    SF(random_variable,value)
-    BootstrapRV(varlist)
-    Convert(random_variable,inc)
-
 Procedures On One Random Variable:
     ConvolutionIID(random_variable,n)
-    CoefOfVar(random_variable)
-    ExpectedValue(random_variable,gX)
-    Entropy(random_variable)
-    Kurtosis(random_variable)
     MaximumIID(random_variable,n)
-    Mean(random_variable)
-    MGF(random_variable)
     MinimumIID(random_variable,n)
     OrderStat(random_variable,n,r)
     ProductIID(random_variable,n)
     RangeStat(random_variable,n)
-    Skewness(random_variable)
     Transform(random_variable,gX)
     Truncate(random_variable,[lw,up])
-    Variance(random_variable)
+    variance(random_variable)
     VerifyPDF(random_variable)
 
 Procedures On Two Random Variables:
@@ -58,7 +36,6 @@ Plotting Procedures:
 """
 
 from applpy import rust_bindings
-from applpy_rust import FastRV
 
 from sympy import (
     Symbol,
@@ -76,12 +53,10 @@ from sympy import (
     nan,
     binomial,
     pprint,
-    log,
     expand,
     zoo,
     latex,
     Rational,
-    Sum,
     Float,
     limit,
 )
@@ -788,7 +763,7 @@ class RV:
                     err_string += " specified"
                     raise RVError(err_string)
             # Convert the random variable to PDF form
-            X_dummy = PDF(self)
+            X_dummy = pdf(self)
             # Check to ensure that the area under the PDF is 1
             print("Now checking for area...")
             area = 0
@@ -830,7 +805,7 @@ class RV:
         #   verify the PDF
         if self.is_discrete_functional():
             # Convert the random variable to PDF form
-            X_dummy = PDF(self)
+            X_dummy = pdf(self)
             # Check to ensure that the area under the PDF is 1
             print("Now checking for area...")
             area = 0
@@ -860,7 +835,7 @@ class RV:
                 return False
         # If the random variable is discrete, verify the PDF
         if self.is_discrete():
-            X_dummy = PDF(self)
+            X_dummy = pdf(self)
             is_valid = rust_bindings.verify_discrete_pdf(X_dummy.func)
             if is_valid:
                 print("is valid")
@@ -893,29 +868,29 @@ class RV:
         # If the inverse method is specified, compute variates using
         #   the IDF function
         if method == "inverse":
-            Xidf = IDF(self)
-            varlist = [IDF(Xidf, random()) for i in range(1, n + 1)]
+            Xidf = idf(self)
+            varlist = [idf(Xidf, random()) for i in range(1, n + 1)]
             return varlist
 
         # Find the cdf and pdf functions (to avoid integrating for
         # each variate
-        cdf = CDF(self)
-        pdf = PDF(self)
-        mean = Mean(self)
+        cdf_rv = cdf(self)
+        pdf_rv = pdf(self)
+        mean_value = mean(self)
         if sensitivity is None:
             # If sensitivity is not specified, set the sensitivity to be
             #   .1% of the mean value for random variates
             if s is None:
-                sensitivity = abs(0000.1 * mean)
+                sensitivity = abs(0000.1 * mean_value)
             # If a percentile is specified, set sensitivity to be .01%
             #   of the mean value
             else:
-                sensitivity = abs(0000.1 * mean)
+                sensitivity = abs(0000.1 * mean_value)
         # Create a list of variates
         varlist = []
         for i in range(n):
             guess_last = oo
-            guess = mean
+            guess = mean_value
             if s is None:
                 val = random()
             else:
@@ -925,19 +900,19 @@ class RV:
                 try:
                     if len(self.func) == 1:
                         guess = guess - (
-                            (cdf.func[0].subs(x, guess) - val) / pdf.func[0].subs(x, guess)
+                            (cdf_rv.func[0].subs(x, guess) - val) / pdf_rv.func[0].subs(x, guess)
                         )
                         guess = guess.evalf()
                     else:
-                        guess = (guess - ((CDF(cdf, guess) - val) / PDF(pdf, guess))).evalf()
+                        guess = (guess - ((cdf(cdf_rv, guess) - val) / pdf(pdf_rv, guess))).evalf()
                 except Exception:
                     if guess > self.support[len(self.support) - 1]:
-                        cfunc = cdf.func[len(self.func) - 1].subs(x, guess)
-                        pfunc = pdf.func[len(self.func) - 1].subs(x, guess)
+                        cfunc = cdf_rv.func[len(self.func) - 1].subs(x, guess)
+                        pfunc = pdf_rv.func[len(self.func) - 1].subs(x, guess)
                         guess = (guess - ((cfunc - val) / pfunc)).evalf()
                     if guess < self.support[0]:
-                        cfunc = cdf.func[0].subs(x, guess)
-                        pfunc = pdf.func[0].subs(x, guess)
+                        cfunc = cdf_rv.func[0].subs(x, guess)
+                        pfunc = pdf_rv.func[0].subs(x, guess)
                         guess = (guess - ((cfunc - val) / pfunc)).evalf()
                 # print guess
             varlist.append(guess)
@@ -946,12 +921,12 @@ class RV:
 
 
 # Conversion Procedures:
-#     CDF(random_variable,value)
-#     CHF(random_variable,value)
-#     HF(random_variable,value)
-#     IDF(random_variable,value)
-#     PDF(random_variable,value)
-#     SF(random_variable,value)
+#     cdf(random_variable,value)
+#     chf(random_variable,value)
+#     hf(random_variable,value)
+#     idf(random_variable,value)
+#     pdf(random_variable,value)
+#     sf(random_variable,value)
 #     BootstrapRV(varlist)
 #     Convert(random_variable,inc)
 
@@ -977,1027 +952,49 @@ def check_value(value, sup):
             return True
 
 
-def CDF(random_variable, value=x, cache=False):
-    """
-    Procedure Name: CDF
-    Purpose: Compute the cdf of a random variable
-    Arguments:  1. random_variable: A random variable
-                2. value: An integer or floating point number
-                3. cache: A binary variable. If True, the result will
-                    be stored in memory for later use. (default is False)
-    Output:     1. CDF of a random variable (if value not specified)
-                2. Value of the CDF at a given point
-                    (if value is specified)
-    """
+def cdf(random_variable, value=x, cache=False):
+    from .conversion import cdf as _cdf
 
-    # Check to make sure the value given is within the random
-    #   variable's support
-    if not isinstance(value, Symbol):
-        if value > random_variable.support[-1]:
-            return 1
-        if value < random_variable.support[0]:
-            return 0
-
-    # If the CDF of the random variable is already cached in memory,
-    #   retriew the value of the CDF and return in.
-    if random_variable.cache is not None and "cdf" in random_variable.cache:
-        if value == x:
-            return random_variable.cache["cdf"]
-        else:
-            return CDF(random_variable.cache["cdf"], value)
-
-    # If the distribution is continous, find and return the distribution
-    #   of the random variable
-    if random_variable.is_continuous():
-        # Short-cut for Weibull, jump straight to the closed form CDF
-        if "Weibull" in random_variable.__class__.__name__:
-            if value == x:
-                Fx = RV(random_variable.cdf, [0, oo], ["continuous", "cdf"])
-                return Fx
-            else:
-                return simplify(random_variable.cdf.subs(x, value))
-
-        # If the random variable is already a cdf, nothing needs to
-        #   be done
-        if random_variable.is_cdf():
-            if value == x:
-                return random_variable
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if (
-                        value >= random_variable.support[i]
-                        and value <= random_variable.support[i + 1]
-                    ):
-                        cdfvalue = random_variable.func[i].subs(x, value)
-                        return simplify(cdfvalue)
-        # If the random variable is a sf, find and return the cdf of the
-        #   random variable
-        if random_variable.domain_type == "sf":
-            X_dummy = SF(random_variable)
-            # Compute the sf for each segment
-            cdflist = []
-            for i in range(len(X_dummy.func)):
-                cdflist.append(1 - X_dummy.func[i])
-            # If no value is specified, return the sf function
-            if value == x:
-                cdffunc = RV(cdflist, X_dummy.support, ["continuous", "cdf"])
-                if cache:
-                    random_variable.add_to_cache("cdf", cdffunc)
-                return cdffunc
-            # If not, return the value of the cdf at the specified value
-            else:
-                for i in range(len(X_dummy.support)):
-                    if value >= X_dummy.support[i] and value <= X_dummy.support[i + 1]:
-                        cdfvalue = cdflist[i].subs(x, value)
-                        return simplify(cdfvalue)
-        # If the random variable is not a cdf or sf, compute the pdf of
-        #   the random variable, and then compute the cdf by integrating
-        #   over each segment of the random variable
-        else:
-            X_dummy = PDF(random_variable)
-            # Substitue the dummy variable 't' into the dummy rv
-            funclist = []
-            for i in range(len(X_dummy.func)):
-                number_types = (int, float, Rational)
-                if not isinstance(X_dummy.func[i], number_types):
-                    newfunc = X_dummy.func[i].subs(x, t)
-                else:
-                    newfunc = X_dummy.func[i]
-                funclist.append(newfunc)
-            # Integrate to find the cdf
-            cdflist = []
-            for i in range(len(funclist)):
-                cdffunc = integrate(funclist[i], (t, X_dummy.support[i], x))
-                # Adjust the constant of integration
-                if i != 0:
-                    const = cdflist[i - 1].subs(x, X_dummy.support[i]) - cdffunc.subs(
-                        x, X_dummy.support[i]
-                    )
-                    cdffunc = cdffunc + const
-                if i == 0:
-                    const = 0 - cdffunc.subs(x, X_dummy.support[i])
-                    cdffunc = cdffunc + const
-                cdflist.append(simplify(cdffunc))
-            # If no value is specified, return the cdf
-            if value == x:
-                cdffunc = RV(cdflist, X_dummy.support, ["continuous", "cdf"])
-                if cache:
-                    random_variable.add_to_cache("cdf", cdffunc)
-                return cdffunc
-            # If a value is specified, return the value of the cdf
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if (
-                        value >= random_variable.support[i]
-                        and value <= random_variable.support[i + 1]
-                    ):
-                        cdfvalue = cdflist[i].subs(x, value)
-                        return simplify(cdfvalue)
-
-    # If the distribution is in discrete functional, find and return the
-    #   distribution of the random variable
-    if random_variable.is_discrete_functional():
-        # If the support is finite, then convert to expanded form and compute
-        #   the CDF
-        if oo not in random_variable.support:
-            if -oo not in random_variable.support:
-                random_variable_2 = Convert(random_variable)
-                return CDF(random_variable_2, value)
-        # If the random variable is already a cdf, nothing needs to
-        #   be done
-        if random_variable.is_cdf():
-            if value == x:
-                return random_variable
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if (
-                        value >= random_variable.support[i]
-                        and value <= random_variable.support[i + 1]
-                    ):
-                        cdfvalue = random_variable.func[i].subs(x, value)
-                        return simplify(cdfvalue)
-        # If the random variable is a sf, find and return the cdf of the
-        #   random variable
-        if random_variable.domain_type == "sf":
-            X_dummy = SF(random_variable)
-            # Compute the sf for each segment
-            cdflist = []
-            for i in range(len(X_dummy.func)):
-                cdflist.append(1 - X_dummy.func[i])
-            # If no value is specified, return the sf function
-            if value == x:
-                cdffunc = RV(cdflist, X_dummy.support, ["discrete_functional", "cdf"])
-                if cache:
-                    random_variable.add_to_cache("cdf", cdffunc)
-                return cdffunc
-            # If not, return the value of the cdf at the specified value
-            else:
-                for i in range(len(X_dummy.support)):
-                    if value >= X_dummy.support[i] and value <= X_dummy.support[i + 1]:
-                        cdfvalue = cdflist[i].subs(x, value)
-                        return simplify(cdfvalue)
-        # If the random variable is not a cdf or sf, compute the pdf of
-        #   the random variable, and then compute the cdf by summing
-        #   over each segment of the random variable
-        else:
-            X_dummy = PDF(random_variable)
-            # Substitue the dummy variable 't' into the dummy rv
-            funclist = []
-            for i in range(len(X_dummy.func)):
-                newfunc = X_dummy.func[i].subs(x, t)
-                funclist.append(newfunc)
-            # Sum to find the cdf
-            cdflist = []
-            for i in range(len(funclist)):
-                cdffunc = Sum(funclist[i], (t, X_dummy.support[i], x)).doit()
-                # Adjust the constant of integration
-                if i != 0:
-                    const = cdflist[i - 1].subs(x, X_dummy.support[i]) - cdffunc.subs(
-                        x, X_dummy.support[i]
-                    )
-                    # cdffunc=cdffunc+const
-                if i == 0:
-                    const = 0 - cdffunc.subs(x, X_dummy.support[i])
-                    # cdffunc=cdffunc+const
-                cdflist.append(simplify(cdffunc))
-            # If no value is specified, return the cdf
-            if value == x:
-                cdffunc = RV(cdflist, X_dummy.support, ["discrete_functional", "cdf"])
-                if cache:
-                    random_variable.add_to_cache("cdf", cdffunc)
-                return cdffunc
-            # If a value is specified, return the value of the cdf
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if (
-                        value >= random_variable.support[i]
-                        and value <= random_variable.support[i + 1]
-                    ):
-                        cdfvalue = cdflist[i].subs(x, value)
-                        return simplify(cdfvalue)
-
-    if random_variable.is_discrete():
-        fast_rv = FastRV(
-            function=random_variable.func,
-            support=random_variable.support,
-            functional_form=random_variable.functional_form,
-            domain_type="discrete",
-        )
-        cdf_random_variable = fast_rv.to_cdf()
-
-        if value != x:
-            return cdf_random_variable.evaluate(value)
-
-        return RV(
-            func=cdf_random_variable.function,
-            support=cdf_random_variable.support,
-            functional_form=cdf_random_variable.functional_form,
-            domain_type="discrete",
-        )
+    return _cdf(random_variable, value=value, cache=cache)
 
 
-def CHF(random_variable, value=x, cache=False):
-    """
-    Procedure Name: CHF
-    Purpose: Compute the chf of a random variable
-    Arguments:  1. random_variable: A random variable
-                2. value: An integer or floating point number
-                    (optional)
-    Output:     1. CHF of a random variable (if value not specified)
-                2. Value of the CHF at a given point
-                    (if value is specified)
-    """
+def chf(random_variable, value=x, cache=False):
+    from .conversion import chf as _chf
 
-    # Check to make sure the value given is within the random
-    #   variable's support
-    if not isinstance(value, Symbol):
-        if value > random_variable.support[-1] or value < random_variable.support[0]:
-            if not random_variable.is_discrete():
-                string = "Value is not within the support of the random variable"
-                raise RVError(string)
-
-    # If the CHF of the random variable is already cached in memory,
-    #   retriew the value of the CHF and return in.
-    if random_variable.cache is not None and "chf" in random_variable.cache:
-        if value == x:
-            return random_variable.cache["chf"]
-        else:
-            return CHF(random_variable.cache["chf"], value)
-
-    # If the distribution is continuous, find and return the chf of
-    #   the random variable
-    if random_variable.is_continuous():
-        # If the distribution is already a chf, nothing needs to
-        #   be done
-        if random_variable.is_chf():
-            if value == x:
-                return random_variable
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if value >= random_variable.support[i]:
-                        if value <= random_variable.support[i + 1]:
-                            chfvalue = random_variable.func[i].subs(x, value)
-                            return simplify(chfvalue)
-        # Otherwise, find and return the chf
-        else:
-            X_dummy = SF(random_variable)
-            # Generate a list of sf functions
-            sflist = []
-            for i in range(len(X_dummy.func)):
-                sflist.append(X_dummy.func[i])
-            # Generate chf functions
-            chffunc = []
-            for i in range(len(sflist)):
-                newfunc = -ln(sflist[i])
-                chffunc.append(simplify(newfunc))
-            # If a value is not specified, return the chf of the
-            #   random variable
-            if value == x:
-                chffunc = RV(chffunc, X_dummy.support, ["continuous", "chf"])
-                if cache:
-                    random_variable.add_to_cache("chf", chffunc)
-                return chffunc
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if value >= random_variable.func[i]:
-                        if value <= random_variable.support[i + 1]:
-                            chfvalue = chffunc[i].subs(x, value)
-                            return simplify(chfvalue)
-
-    # If the distribution is a discrete function, find and return the chf of
-    #   the random variable
-    if random_variable.is_discrete_functional():
-        # If the distribution is already a chf, nothing needs to
-        #   be done
-        if random_variable.is_chf():
-            if value == x:
-                return random_variable
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if value >= random_variable.support[i]:
-                        if value <= random_variable.support[i + 1]:
-                            chfvalue = random_variable.func[i].subs(x, value)
-                            return simplify(chfvalue)
-        # If the support is finite, then convert to expanded form and compute
-        #   the CHF
-        if oo not in random_variable.support:
-            if -oo not in random_variable.support:
-                random_variable_2 = Convert(random_variable)
-                return CHF(random_variable_2, value)
-        # Otherwise, find and return the chf
-        else:
-            X_dummy = SF(random_variable)
-            # Generate a list of sf functions
-            sflist = []
-            for i in range(len(X_dummy.func)):
-                sflist.append(X_dummy.func[i])
-            # Generate chf functions
-            chffunc = []
-            for i in range(len(sflist)):
-                newfunc = -ln(sflist[i])
-                chffunc.append(simplify(newfunc))
-            # If a value is not specified, return the chf of the
-            #   random variable
-            if value == x:
-                chfrv = RV(chffunc, X_dummy.support, ["discrete_functional", "chf"])
-                if cache:
-                    random_variable.add_to_cache("chf", chfrv)
-                return chfrv
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if value >= random_variable.func[i]:
-                        if value <= random_variable.support[i + 1]:
-                            chfvalue = chffunc[i].subs(x, value)
-                            return simplify(chfvalue)
-
-    if random_variable.is_discrete():
-        fast_rv = FastRV(
-            function=random_variable.func,
-            support=random_variable.support,
-            functional_form=random_variable.functional_form,
-            domain_type="discrete",
-        )
-        chf_random_variable = fast_rv.to_chf()
-
-        if value != x:
-            return chf_random_variable.evaluate(value)
-
-        return RV(
-            func=chf_random_variable.function,
-            support=chf_random_variable.support,
-            functional_form=chf_random_variable.functional_form,
-            domain_type="discrete",
-        )
+    return _chf(random_variable, value=value, cache=cache)
 
 
-def HF(random_variable, value=x, cache=False):
-    """
-    Procedure Name: HF
-    Purpose: Compute the hf of a random variable
-    Arguments:  1. random_variable: A random variable
-                2. value: An integer or floating point number
-                    (optional)
-    Output:     1. HF of a random variable (if value not specified)
-                2. Value of the HF at a given point
-                    (if value is specified)
-    """
+def hf(random_variable, value=x, cache=False):
+    from .conversion import hf as _hf
 
-    # Check to make sure the value given is within the random
-    #   variable's support
-    if not isinstance(value, Symbol):
-        if value > random_variable.support[-1] or value < random_variable.support[0]:
-            if not random_variable.is_discrete():
-                string = "Value is not within the support of the random variable"
-                raise RVError(string)
-
-    # If the HF of the random variable is already cached in memory,
-    #   retriew the value of the HF and return in.
-    if random_variable.cache is not None and "hf" in random_variable.cache:
-        if value == x:
-            return random_variable.cache["hf"]
-        else:
-            return HF(random_variable.cache["hf"], value)
-
-    # If the distribution is continuous, find and return the hf of
-    #   the random variable
-    if random_variable.is_continuous():
-        # If the distribution is already a hf, nothing needs to be
-        #   done
-        if random_variable.is_hf():
-            if value == x:
-                return random_variable
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if value >= random_variable.support[i]:
-                        if value <= random_variable.support[i + 1]:
-                            hfvalue = random_variable.func[i].subs(x, value)
-                            return simplify(hfvalue)
-        # If the distribution is in chf form, use differentiation
-        #   to find the hf
-        if random_variable.is_chf():
-            X_dummy = CHF(random_variable)
-            # Generate a list of hf functions
-            hflist = []
-            for i in range(len(X_dummy.func)):
-                newfunc = diff(X_dummy.func[i], x)
-                hflist.append(newfunc)
-            if value == x:
-                hfrv = RV(hflist, X_dummy.support, ["continuous", "hf"])
-                if cache:
-                    random_variable.add_to_cache("hf", hfrv)
-                return hfrv
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if value >= random_variable.support[i]:
-                        if value <= random_variable.support[i + 1]:
-                            hfvalue = hflist[i].subs(x, value)
-                            return simplify(hfvalue)
-        # In all other cases, use the pdf and the sf to find the hf
-        else:
-            X_pdf = PDF(random_variable).func
-            X_sf = SF(random_variable).func
-            # Create a list of hf functions
-            hflist = []
-            for i in range(len(random_variable.func)):
-                hfunc = (X_pdf[i]) / (X_sf[i])
-                hflist.append(simplify(hfunc))
-            if value == x:
-                hfrv = RV(hflist, random_variable.support, ["continuous", "hf"])
-                if cache:
-                    random_variable.add_to_cache("hf", hfrv)
-                return hfrv
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if value >= random_variable.support[i]:
-                        if value <= random_variable.support[i + 1]:
-                            hfvalue = hflist[i].subs(x, value)
-                            return simplify(hfvalue)
-
-    # If the distribution is a discrete function, find and return the hf of
-    #   the random variable
-    if random_variable.is_discrete_functional():
-        # If the distribution is already a hf, nothing needs to be
-        #   done
-        if random_variable.is_hf():
-            if value == x:
-                return random_variable
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if value >= random_variable.support[i]:
-                        if value <= random_variable.support[i + 1]:
-                            hfvalue = random_variable.func[i].subs(x, value)
-                            return simplify(hfvalue)
-        # If the support is finite, then convert to expanded form and compute
-        #   the HF
-        if oo not in random_variable.support:
-            if -oo not in random_variable.support:
-                random_variable_2 = Convert(random_variable)
-                return HF(random_variable_2, value)
-        # In all other cases, use the pdf and the sf to find the hf
-        else:
-            X_pdf = PDF(random_variable).func
-            X_sf = SF(random_variable).func
-            # Create a list of hf functions
-            hflist = []
-            for i in range(len(random_variable.func)):
-                hfunc = (X_pdf[i]) / (X_sf[i])
-                hflist.append(simplify(hfunc))
-            if value == x:
-                hfrv = RV(hflist, random_variable.support, ["discrete_functional", "hf"])
-                if cache:
-                    random_variable.add_to_cache("hf", hfrv)
-                return hfrv
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if value >= random_variable.support[i]:
-                        if value <= random_variable.support[i + 1]:
-                            hfvalue = hflist[i].subs(x, value)
-                            return simplify(hfvalue)
-
-    if random_variable.is_discrete():
-        fast_rv = FastRV(
-            function=random_variable.func,
-            support=random_variable.support,
-            functional_form=random_variable.functional_form,
-            domain_type="discrete",
-        )
-        hf_random_variable = fast_rv.to_hf()
-
-        if value != x:
-            return hf_random_variable.evaluate(value)
-
-        return RV(
-            func=hf_random_variable.function,
-            support=hf_random_variable.support,
-            functional_form=hf_random_variable.functional_form,
-            domain_type="discrete",
-        )
+    return _hf(random_variable, value=value, cache=cache)
 
 
-def IDF(random_variable, value=x, cache=False):
-    """
-    Procedure Name: IDF
-    Purpose: Compute the idf of a random variable
-    Arguments:  1. random_variable: A random variable
-                2. value: An integer or floating point number
-                    (optional)
-    Output:     1. IDF of a random variable (if value not specified)
-                2. Value of the IDF at a given point
-                    (if value is specified)
-    """
+def idf(random_variable, value=x, cache=False):
+    from .conversion import idf as _idf
 
-    # Check to make sure the value given is within the random
-    #   variable's support
-    if not isinstance(value, Symbol):
-        if value > 1 or value < 0:
-            if not random_variable.is_discrete():
-                string = "Value is not within the support of the random variable"
-                raise RVError(string)
-
-    # If the IDF of the random variable is already cached in memory,
-    #   retriew the value of the IDF and return in.
-    if random_variable.cache is not None and "idf" in random_variable.cache:
-        if value == x:
-            return random_variable.cache["idf"]
-        else:
-            return IDF(random_variable.cache["idf"], value)
-
-    # If the distribution is continuous, find and return the idf
-    #   of the random variable
-    if random_variable.is_continuous():
-        if value == x:
-            if random_variable.is_idf():
-                return random_variable
-            # Convert the random variable to its CDF form
-            X_dummy = CDF(random_variable)
-            # Create values used to check for correct inverse
-            check = []
-            for i in range(len(X_dummy.support) - 1):
-                if X_dummy.support[i] == -oo and X_dummy.support[i + 1] == oo:
-                    check.append(0)
-                elif X_dummy.support[i] == -oo and X_dummy.support[i + 1] != oo:
-                    check.append(X_dummy.support[i + 1] - 1)
-                elif X_dummy.support[i] != -oo and X_dummy.support[i + 1] == oo:
-                    check.append(X_dummy.support[i] + 1)
-                else:
-                    check.append((X_dummy.support[i] + X_dummy.support[i + 1]) / 2)
-            # Use solve to create a list of candidate inverse functions
-            # Check to see which of the candidate inverse functions is correct
-            idffunc = []
-            for i in range(len(X_dummy.func)):
-                invlist = solve(X_dummy.func[i] - t, x)
-                if len(invlist) == 1:
-                    idffunc.append(invlist[0])
-                else:
-                    # The flag is used to determine if two separate inverses
-                    #   could represent the inverse of the CDF. If this is the
-                    #   case, an exception is raised
-                    flag = False
-                    for j in range(len(invlist)):
-                        subsfunc = X_dummy.func[i]
-                        val = invlist[j].subs(t, subsfunc.subs(x, check[i])).evalf()
-                        if abs(val - check[i]) < 0.00001:
-                            if flag:
-                                error_string = "Could not find the"
-                                error_string += " correct inverse"
-                                raise RVError(error_string)
-                            idffunc.append(invlist[j])
-                            flag = True
-            # Create a list of supports for the IDF
-            idfsup = []
-            for i in range(len(X_dummy.support)):
-                idfsup.append(CDF(X_dummy, X_dummy.support[i]))
-            # Replace t with x
-            idffunc2 = []
-            for i in range(len(idffunc)):
-                func = idffunc[i].subs(t, x)
-                idffunc2.append(simplify(func))
-            # Return the IDF
-            idfrv = RV(idffunc2, idfsup, ["continuous", "idf"])
-            if cache:
-                random_variable.add_to_cache("idf", idfrv)
-            return idfrv
-
-        # If a value is specified, return the value of the IDF at x=value
-        if value != x:
-            X_dummy = IDF(random_variable)
-            for i in range(len(X_dummy.support)):
-                if value >= X_dummy.support[i] and value <= X_dummy.support[i + 1]:
-                    idfvalue = X_dummy.func[i].subs(x, value)
-                    return simplify(idfvalue)
-
-    # If the distribution is a discrete function, find and return the idf
-    #   of the random variable
-    if random_variable.is_discrete_functional():
-        # Preserve legacy behavior for discrete_functional IDF value lookup.
-        if random_variable.is_idf() and value != x:
-            raise UnboundLocalError("local variable 'idfvalue' referenced before assignment")
-        # If the support is finite, then convert to expanded form and compute
-        #   the IDF
-        if oo not in random_variable.support:
-            if -oo not in random_variable.support:
-                random_variable_2 = Convert(random_variable)
-                return IDF(random_variable_2, value)
-        if value == x:
-            if random_variable.is_idf():
-                return random_variable
-            # Convert the random variable to its CDF form
-            X_dummy = CDF(random_variable)
-            # Create values used to check for correct inverse
-            check = []
-            for i in range(len(X_dummy.support) - 1):
-                if X_dummy.support[i] == -oo and X_dummy.support[i + 1] == oo:
-                    check.append(0)
-                elif X_dummy.support[i] == -oo and X_dummy.support[i + 1] != oo:
-                    check.append(X_dummy.support[i + 1] - 1)
-                elif X_dummy.support[i] != -oo and X_dummy.support[i + 1] == oo:
-                    check.append(X_dummy.support[i] + 1)
-                else:
-                    check.append((X_dummy.support[i] + X_dummy.support[i + 1]) / 2)
-            # Use solve to create a list of candidate inverse functions
-            # Check to see which of the candidate inverse functions is correct
-            idffunc = []
-            for i in range(len(X_dummy.func)):
-                invlist = solve(X_dummy.func[i] - t, x)
-                if len(invlist) == 1:
-                    idffunc.append(invlist[0])
-                else:
-                    # The flag is used to determine if two separate inverses
-                    #   could represent the inverse of the CDF. If this is the
-                    #   case, an exception is raised
-                    flag = False
-                    for j in range(len(invlist)):
-                        subsfunc = X_dummy.func[i]
-                        val = invlist[j].subs(t, subsfunc.subs(x, check[i])).evalf()
-                        if abs(val - check[i]) < 0.00001:
-                            if flag:
-                                error_string = "Could not find the correct"
-                                error_string += " inverse"
-                                raise RVError(error_string)
-                            idffunc.append(invlist[j])
-                            flag = True
-            # Create a list of supports for the IDF
-            idfsup = []
-            for i in range(len(X_dummy.support)):
-                idfsup.append(CDF(X_dummy, X_dummy.support[i]))
-            # Replace t with x
-            idffunc2 = []
-            for i in range(len(idffunc)):
-                func = idffunc[i].subs(t, x)
-                idffunc2.append(simplify(func))
-            # Return the IDF
-            idfsup[0] = 0
-            idfrv = RV(idffunc2, idfsup, ["discrete_functional", "idf"])
-            if cache:
-                random_variable.add_to_cache("idf", idfrv)
-            return idfrv
-
-        # If a value is specified, find thevalue of the idf
-        if value != x:
-            X_dummy = IDF(random_variable)
-            for i in range(len(X_dummy.support)):
-                if value >= X_dummy.support[i] and value <= X_dummy.support[i + 1]:
-                    idfvalue = X_dummy.func[i].subs(x, value)
-                    return simplify(idfvalue)
-
-    if random_variable.is_discrete():
-        fast_rv = FastRV(
-            function=random_variable.func,
-            support=random_variable.support,
-            functional_form=random_variable.functional_form,
-            domain_type="discrete",
-        )
-        idf_random_variable = fast_rv.to_idf()
-
-        if value != x:
-            return idf_random_variable.evaluate(value)
-
-        return RV(
-            func=idf_random_variable.function,
-            support=idf_random_variable.support,
-            functional_form=idf_random_variable.functional_form,
-            domain_type="discrete",
-        )
+    return _idf(random_variable, value=value, cache=cache)
 
 
-def PDF(random_variable, value=x, cache=False):
-    """
-    Procedure Name: PDF
-    Purpose: Compute the pdf of a random variable
-    Arguments:  1. random_variable: A random variable
-                2. value: An integer or floating point number (optional)
-    Output:     1. PDF of a random variable (if value not specified)
-                2. Value of the PDF at a given point (if value is specified)
-    """
+def pdf(random_variable, value=x, cache=False):
+    from .conversion import pdf as _pdf
 
-    # Check to make sure the value given is within the random
-    #   variable's support
-    if not isinstance(value, Symbol):
-        if value > random_variable.support[-1] or value < random_variable.support[0]:
-            if not random_variable.is_discrete():
-                string = "Value is not within the support of the random variable"
-                raise RVError(string)
-
-    # If the PDF of the random variable is already cached in memory,
-    #   retriew the value of the PDF and return in.
-    if random_variable.cache is not None and "pdf" in random_variable.cache:
-        if value == x:
-            return random_variable.cache["pdf"]
-        else:
-            return PDF(random_variable.cache["pdf"], value)
-
-    # If the distribution is continuous, find and return the pdf of the
-    # random variable
-    if random_variable.is_continuous():
-        # If the distribution is already a pdf, nothing needs to be done
-        if random_variable.is_pdf():
-            if value == x:
-                return random_variable
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if (
-                        value >= random_variable.support[i]
-                        and value <= random_variable.support[i + 1]
-                    ):
-                        pdfvalue = random_variable.func[i].subs(x, value)
-                        return simplify(pdfvalue)
-        # If the distribution is a hf or chf, use integration to find the pdf
-        if random_variable.is_hf() or random_variable.is_chf():
-            X_dummy = HF(random_variable)
-            # Substitute the dummy variable 't' into the hazard function
-            hfsubslist = []
-            for i in range(len(X_dummy.func)):
-                newfunc = X_dummy.func[i].subs(x, t)
-                hfsubslist.append(newfunc)
-            # Integrate the hazard function
-            intlist = []
-            for i in range(len(hfsubslist)):
-                newfunc = integrate(hfsubslist[i], (t, X_dummy.support[i], x))
-                # Correct the constant of integration
-                if i != 0:
-                    const = intlist[i - 1].subs(x, X_dummy.support[i])
-                    const = const - newfunc.subs(x, X_dummy.support[i])
-                    newfunc = newfunc + const
-                if i == 0:
-                    const = 0 - newfunc.subs(x, X_dummy.support[i])
-                    newfunc = newfunc + const
-                intlist.append(simplify(newfunc))
-            # Multiply to find the pdf
-            pdffunc = []
-            for i in range(len(intlist)):
-                newfunc = X_dummy.func[i] * exp(-intlist[i])
-                pdffunc.append(simplify(newfunc))
-            if value == x:
-                pdfrv = RV(pdffunc, random_variable.support, ["continuous", "pdf"])
-                if cache:
-                    random_variable.add_to_cache("pdf", pdfrv)
-                return pdfrv
-            if value != x:
-                for i in range(len(X_dummy.support)):
-                    if value >= X_dummy.support[i]:
-                        if value <= X_dummy.support[i + 1]:
-                            pdfvalue = pdffunc[i].subs(x, value)
-                            return simplify(pdfvalue)
-        # In all other cases, find the pdf by differentiating the cdf
-        else:
-            X_dummy = CDF(random_variable)
-            if value == x:
-                pdflist = []
-                for i in range(len(X_dummy.func)):
-                    pdflist.append(diff(X_dummy.func[i], x))
-                pdfrv = RV(pdflist, random_variable.support, ["continuous", "pdf"])
-                if cache:
-                    random_variable.add_to_cache("pdf", pdfrv)
-                return pdfrv
-            if value != x:
-                for i in range(len(X_dummy.support)):
-                    for i in range(len(X_dummy.support)):
-                        if value >= X_dummy.support[i]:
-                            if value <= X_dummy.support[i + 1]:
-                                pdffunc = diff(X_dummy.func[i], x)
-                                pdfvalue = pdffunc.subs(x, value)
-                                return simplify(pdfvalue)
-
-    # If the distribution is a discrete function, find and return the pdf
-    if random_variable.is_discrete_functional():
-        # If the distribution is already a pdf, nothing needs to be done
-        if random_variable.is_pdf():
-            if value == x:
-                return random_variable
-            if value != x:
-                for i in range(len(random_variable.support)):
-                    if (
-                        value >= random_variable.support[i]
-                        and value <= random_variable.support[i + 1]
-                    ):
-                        pdfvalue = random_variable.func[i].subs(x, value)
-                        return simplify(pdfvalue)
-        # If the support is finite, then convert to expanded form and compute
-        #   the PDF
-        if oo not in random_variable.support:
-            if -oo not in random_variable.support:
-                random_variable_2 = Convert(random_variable)
-                return PDF(random_variable_2, value)
-        # If the distribution is a hf or chf, use summation to find the pdf
-        if random_variable.is_hf() or random_variable.is_chf():
-            X_dummy = HF(random_variable)
-            # Substitute the dummy variable 't' into the hazard function
-            hfsubslist = []
-            for i in range(len(X_dummy.func)):
-                newfunc = X_dummy.func[i].subs(x, t)
-                hfsubslist.append(newfunc)
-            # Integrate the hazard function
-            sumlist = []
-            for i in range(len(hfsubslist)):
-                newfunc = summation(hfsubslist[i], (t, X_dummy.support[i], x))
-                # Correct the constant of integration
-                if i != 0:
-                    const = sumlist[i - 1].subs(x, X_dummy.support[i])
-                    const = const - newfunc.subs(x, X_dummy.support[i])
-                    newfunc = newfunc + const
-                if i == 0:
-                    const = 0 - newfunc.subs(x, X_dummy.support[i])
-                    newfunc = newfunc + const
-                intlist.append(simplify(newfunc))
-            # Multiply to find the pdf
-            pdffunc = []
-            for i in range(len(intlist)):
-                newfunc = X_dummy.func[i] * exp(-sumlist[i])
-                pdffunc.append(simplify(newfunc))
-            if value == x:
-                pdfrv = RV(pdffunc, random_variable.support, ["discrete_functional", "pdf"])
-                if cache:
-                    random_variable.add_to_cache("pdf", pdfrv)
-                return pdfrv
-            if value != x:
-                for i in range(len(X_dummy.support)):
-                    if value >= X_dummy.support[i] and value <= X_dummy.support[i + 1]:
-                        pdfvalue = pdffunc[i].subs(x, value)
-                        return simplify(pdfvalue)
-        # In all other cases, find the pdf by differentiating the cdf
-        else:
-            X_dummy = CDF(random_variable)
-            if value == x:
-                pdflist = []
-                # Find the pmf by subtracting CDF(X,x)-CDF(X,x-1)
-                for i in range(len(X_dummy.func)):
-                    funcX1 = X_dummy.func[i]
-                    funcX0 = X_dummy.func[i].subs(x, x - 1)
-                    pmf = simplify(funcX1 - funcX0)
-                    pdflist.append(pmf)
-                pdfrv = RV(pdflist, random_variable.support, ["discrete_functional", "pdf"])
-                if cache:
-                    random_variable.add_to_cache("pdf", pdfrv)
-                return pdfrv
-            if value != x:
-                for i in range(len(X_dummy.support)):
-                    for i in range(len(X_dummy.support)):
-                        if value >= X_dummy.support[i]:
-                            if value <= X_dummy.support[i + 1]:
-                                funcX1 = X_dummy.func[i]
-                                funcX0 = X_dummy.func[i].subs(x, x - 1)
-                                pmf = simplify(funcX1 - funcX0)
-                                pdfvalue = pmf.subs(x, value)
-                                return simplify(pdfvalue)
-
-    if random_variable.is_discrete():
-        fast_rv = FastRV(
-            function=random_variable.func,
-            support=random_variable.support,
-            functional_form=random_variable.functional_form,
-            domain_type="discrete",
-        )
-        pdf_random_variable = fast_rv.to_pdf()
-
-        if value != x:
-            return pdf_random_variable.evaluate(value)
-
-        return RV(
-            func=pdf_random_variable.function,
-            support=pdf_random_variable.support,
-            functional_form=pdf_random_variable.functional_form,
-            domain_type="discrete",
-        )
+    return _pdf(random_variable, value=value, cache=cache)
 
 
-def SF(random_variable, value=x, cache=False):
-    """
-    Procedure Name: SF
-    Purpose: Compute the SF of a random variable
-    Arguments:  1. random_variable: A random variable
-                2. value: An integer or floating point number (optional)
-    Output:     1. SF of a random variable (if value not specified)
-                2. Value of the SF at a given point (if value is specified)
-    """
+def sf(random_variable, value=x, cache=False):
+    from .conversion import sf as _sf
 
-    # Check to make sure the value given is within the random
-    #   variable's support
-    if not isinstance(value, Symbol):
-        if value > random_variable.support[-1]:
-            return 0
-        if value < random_variable.support[0]:
-            return 1
+    return _sf(random_variable, value=value, cache=cache)
 
-    # If the SF of the random variable is already cached in memory,
-    #   retriew the value of the SF and return in.
-    if random_variable.cache is not None and "sf" in random_variable.cache:
-        if value == x:
-            return random_variable.cache["sf"]
-        else:
-            return SF(random_variable.cache["sf"], value)
 
-    # If the distribution is continuous, find and return the sf of the
-    # random variable
-    if random_variable.is_continuous():
-        # If the distribution is already a sf, nothing needs to be done
-        if random_variable.is_sf():
-            if value == x:
-                return random_variable
-            else:
-                return 1 - CDF(random_variable, value)
-                # for i in range(len(random_variable.support)):
-                #    if value>=random_variable.support[i] and value<=random_variable.support[i+1]:
-                #        sfvalue=random_variable.func[i].subs(x,value)
-                #        return simplify(sfvalue)
-        # If not, then use subtraction to find the sf
-        else:
-            X_dummy = CDF(random_variable)
-            # Compute the sf for each segment
-            sflist = []
-            for i in range(len(X_dummy.func)):
-                sflist.append(1 - X_dummy.func[i])
-            if value == x:
-                sfrv = RV(sflist, random_variable.support, ["continuous", "sf"])
-                if cache:
-                    random_variable.add_to_cache("sf", sfrv)
-                return sfrv
-            if value != x:
-                return 1 - CDF(random_variable, value)
-                # for i in range(len(X_dummy.support)):
-                #    if value>=X_dummy.support[i]:
-                #       if value<=X_dummy.support[i+1]:
-                #           sfvalue=sflist[i].subs(x,value)
-                #           return simplify(sfvalue)
-
-    # If the distribution is discrete, find and return the sf of the
-    # random variable
-    if random_variable.is_discrete_functional():
-        if oo not in random_variable.support:
-            if -oo not in random_variable.support:
-                random_variable_2 = Convert(random_variable)
-                return SF(random_variable_2, value)
-        # If the distribution is already a sf, nothing needs to be done
-        if random_variable.is_sf():
-            if value == x:
-                return random_variable
-            else:
-                return 1 - CDF(random_variable, value)
-                # for i in range(len(random_variable.support)):
-                #    if value>=random_variable.support[i] and value<=random_variable.support[i+1]:
-                #        sfvalue=random_variable.func[i].subs(x,value)
-                #        return simplify(sfvalue)
-        # If not, then use subtraction to find the sf
-        else:
-            X_dummy = CDF(random_variable)
-            # Compute the sf for each segment
-            sflist = []
-            for i in range(len(X_dummy.func)):
-                sflist.append(1 - X_dummy.func[i])
-            if value == x:
-                sfrv = RV(sflist, random_variable.support, ["continuous", "sf"])
-                if cache:
-                    random_variable.add_to_cache("sf", sfrv)
-                return sfrv
-            if value != x:
-                return 1 - CDF(random_variable, value)
-                # for i in range(len(X_dummy.support)):
-                #    if value>=X_dummy.support[i] and
-                #       value<=X_dummy.support[i+1]:
-                #           sfvalue=sflist[i].subs(x,value)
-                #           return simplify(sfvalue)
-
-    # If the distribution is a discrete function, find and return the sf of the
-    # random variable
-    if random_variable.is_discrete_functional():
-        # If the distribution is already a sf, nothing needs to be done
-        if random_variable.is_sf():
-            if value == x:
-                return random_variable
-            else:
-                return 1 - CDF(random_variable, value)
-        # If not, then use subtraction to find the sf
-        else:
-            X_dummy = CDF(random_variable)
-            # Compute the sf for each segment
-            sflist = []
-            for i in range(len(X_dummy.func)):
-                sflist.append(1 - X_dummy.func[i])
-            if value == x:
-                sfrv = RV(sflist, random_variable.support, ["discrete_functional", "sf"])
-                if cache:
-                    random_variable.add_to_cache("sf", sfrv)
-                return sfrv
-            if value != x:
-                return 1 - CDF(random_variable, value)
-
-    if random_variable.is_discrete():
-        fast_rv = FastRV(
-            function=random_variable.func,
-            support=random_variable.support,
-            functional_form=random_variable.functional_form,
-            domain_type="discrete",
-        )
-        sf_random_variable = fast_rv.to_sf()
-
-        if value != x:
-            return sf_random_variable.evaluate(value)
-
-        return RV(
-            func=sf_random_variable.function,
-            support=sf_random_variable.support,
-            functional_form=sf_random_variable.functional_form,
-            domain_type="discrete",
-        )
+# Backward-compatible aliases
+CDF = cdf
+CHF = chf
+HF = hf
+IDF = idf
+PDF = pdf
+SF = sf
 
 
 def BootstrapRV(varlist, symbolic=False):
@@ -2060,22 +1057,22 @@ def Convert(random_variable, inc=1):
 #
 # Procedures:
 #     ConvolutionIID(random_variable,n)
-#     CoefOfVar(random_variable)
-#     ExpectedValue(random_variable,gX)
-#     Entropy(random_variable)
-#     Kurtosis(random_variable)
+#     coef_of_var(random_variable)
+#     expected_value(random_variable,gX)
+#     entropy(random_variable)
+#     kurtosis(random_variable)
 #     MaximumIID(random_variable,n)
-#     Mean(random_variable)
-#     MGF(random_variable)
+#     mean(random_variable)
+#     mgf(random_variable)
 #     MinimumIID(random_variable,n)
 #     OrderStat(random_variable,n,r)
 #     Power(Rvar,n)
 #     ProductIID(random_variable,n)
-#     Skewness(random_variable)
+#     skewness(random_variable)
 #     SqRt(random_variable)
 #     Transform(random_variable,gX)
 #     Truncate(random_variable,[lw,up])
-#     Variance(random_variable)
+#     variance(random_variable)
 
 
 def ConvolutionIID(random_variable, n):
@@ -2091,140 +1088,70 @@ def ConvolutionIID(random_variable, n):
         raise RVError("The second argument must be an integer")
 
     # Compute the iid convolution
-    X_dummy = PDF(random_variable)
+    X_dummy = pdf(random_variable)
     X_final = X_dummy
     for i in range(n - 1):
         X_final += X_dummy
-    return PDF(X_final)
+    return pdf(X_final)
 
 
-def CoefOfVar(random_variable, cache=False):
-    """
-    Procedure Name: CoefOfVar
-    Purpose: Compute the coefficient of variation of a random variable
-    Arguments:  1. random_variable: A random variable
-    Output:     1. The coefficient of variation
-    """
-    # If the input is a list of data, compute the CoefofVar
-    #   for the data set
-    if isinstance(random_variable, list):
-        Xstar = BootstrapRV(random_variable)
-        return CoefOfVar(Xstar)
+def coef_of_var(random_variable, cache=False):
+    from .moments import coef_of_var as _CoefOfVar
 
-    # If the COV of the random variable is already cached in memory,
-    #   retriew the value of the COV and return in.
-    if random_variable.cache is not None and "cov" in random_variable.cache:
-        return random_variable.cache["cov"]
-
-    # Compute the coefficient of varation
-    expect = Mean(random_variable)
-    sig = Variance(random_variable)
-    cov = (sqrt(sig)) / expect
-    cov = simplify(cov)
-    if cache:
-        random_variable.add_to_cache("cov", cov)
-    return cov
+    return _CoefOfVar(random_variable, cache=cache)
 
 
-def ExpectedValue(random_variable, gX=x):
-    """
-    Procedure Name: ExpectedValue
-    Purpose: Computes the expected value of X
-    Arguments:  1. random_variable: A random variable
-                2. gX: A transformation of x
-    Output:     1. E(gX)
-    """
-    # If the input is a list of data, compute the Expected Value
-    #   for the data set
-    if isinstance(random_variable, list):
-        Xstar = BootstrapRV(random_variable)
-        return ExpectedValue(Xstar, gX)
+def expected_value(random_variable, gX=x):
+    from .moments import expected_value as _ExpectedValue
 
-    # Convert the random variable to its PDF form
-    fx = PDF(random_variable)
-    # If the distribution is continuous, compute the expected
-    #   value
-    if fx.is_continuous():
-        Expect = 0
-        for i in range(len(fx.func)):
-            Expect += integrate(gX * fx.func[i], (x, fx.support[i], fx.support[i + 1]))
-        return simplify(Expect)
-
-    # If the distribution is a discrete function, compute the expected
-    #   value
-    if fx.is_discrete_functional():
-        Expect = 0
-        for i in range(len(fx.func)):
-            Expect += summation(gX * fx.func[i], (x, fx.support[i], fx.support[i + 1]))
-        return simplify(Expect)
-
-    if fx.is_discrete():
-        fx_support = [gX.subs(x, value) for value in fx.support]
-        fx_trans = FastRV(
-            function=fx.func,
-            support=fx_support,
-            functional_form=fx.functional_form,
-            domain_type=fx.domain_type,
-        )
-        return fx_trans.mean()
+    return _ExpectedValue(random_variable, gX=gX)
 
 
-def Entropy(random_variable, cache=False):
-    """
-    Procedure Name: Entropy
-    Purpose: Compute the entory of a random variable
-    Arguments:  1. random_variable: A random variable
-    Output:     1. The entropy of a random variable
-    """
-    # If the input is a list of data, compute the entropy
-    #   for the data set
-    if isinstance(random_variable, list):
-        Xstar = BootstrapRV(random_variable)
-        return Entropy(Xstar)
+def entropy(random_variable, cache=False):
+    from .moments import entropy as _Entropy
 
-    # If the entropy of the random variable is already cached in memory,
-    #   retriew the value of the entropy and return in.
-    if random_variable.cache is not None and "entropy" in random_variable.cache:
-        return random_variable.cache["entropy"]
-
-    entropy = ExpectedValue(random_variable, log(x, 2))
-    entropy = simplify(entropy)
-    if cache:
-        random_variable.add_to_cache("entropy", entropy)
-    return simplify(entropy)
+    return _Entropy(random_variable, cache=cache)
 
 
-def Kurtosis(random_variable, cache=False):
-    """
-    Procedure Name: Kurtosis
-    Purpose: Compute the Kurtosis of a random variable
-    Arguments:  1. random_variable: A random variable
-    Output:     1. The kurtosis of a random variable
-    """
-    # If the input is a list of data, compute the kurtosis
-    #   for the data set
-    if isinstance(random_variable, list):
-        Xstar = BootstrapRV(random_variable)
-        return Kurtosis(Xstar)
+def kurtosis(random_variable, cache=False):
+    from .moments import kurtosis as _Kurtosis
 
-    # If the kurtosis of the random variable is already cached in memory,
-    #   retriew the value of the kurtosis and return in.
-    if random_variable.cache is not None and "kurtosis" in random_variable.cache:
-        return random_variable.cache["kurtosis"]
+    return _Kurtosis(random_variable, cache=cache)
 
-    # Compute the kurtosis
-    expect = Mean(random_variable)
-    sig = sqrt(Variance(random_variable))
-    Term1 = ExpectedValue(random_variable, x**4)
-    Term2 = 4 * expect * ExpectedValue(random_variable, x**3)
-    Term3 = 6 * (expect**2) * ExpectedValue(random_variable, x**2)
-    Term4 = 3 * expect**4
-    kurt = (Term1 - Term2 + Term3 - Term4) / (sig**4)
-    kurt = simplify(kurt)
 
-    if cache:
-        random_variable.add_to_cache("kurtosis", kurt)
-    return simplify(kurt)
+def mean(random_variable, cache=False):
+    from .moments import mean as _Mean
+
+    return _Mean(random_variable, cache=cache)
+
+
+def mgf(random_variable, cache=False):
+    from .moments import mgf as _MGF
+
+    return _MGF(random_variable, cache=cache)
+
+
+def skewness(random_variable, cache=False):
+    from .moments import skewness as _Skewness
+
+    return _Skewness(random_variable, cache=cache)
+
+
+def variance(random_variable, cache=False):
+    from .moments import variance as _Variance
+
+    return _Variance(random_variable, cache=cache)
+
+
+# Backward-compatible aliases
+CoefOfVar = coef_of_var
+ExpectedValue = expected_value
+Entropy = entropy
+Kurtosis = kurtosis
+Mean = mean
+MGF = mgf
+Skewness = skewness
+Variance = variance
 
 
 def MaximumIID(random_variable, n=Symbol("n")):
@@ -2251,90 +1178,7 @@ def MaximumIID(random_variable, n=Symbol("n")):
         X_final = X_dummy
         for i in range(n - 1):
             X_final = Maximum(X_final, X_dummy)
-        return PDF(X_final)
-
-
-def Mean(random_variable, cache=False):
-    """
-    Procedure Name: Mean
-    Purpose: Compute the mean of a random variable
-    Arguments: 1. random_variable: A random variable
-    Output:    1. The mean of a random variable
-    """
-    # If the input is a list of data, compute the mean
-    #   for the data set
-    if isinstance(random_variable, list):
-        Xstar = BootstrapRV(random_variable)
-        return Mean(Xstar)
-
-    # If the mean of the random variable is already cached in memory,
-    #   retriew the value of the mean and return in.
-    if random_variable.cache is not None and "mean" in random_variable.cache:
-        return random_variable.cache["mean"]
-
-    # Find the PDF of the random variable
-
-    # If the random variable is continuous, find and return the mean
-    X_dummy = PDF(random_variable)
-    if X_dummy.is_continuous():
-        # Create list of x*f(x)
-        meanfunc = []
-        for i in range(len(X_dummy.func)):
-            meanfunc.append(x * X_dummy.func[i])
-        # Integrate to find the mean
-        meanval = 0
-        for i in range(len(X_dummy.func)):
-            val = integrate(meanfunc[i], (x, X_dummy.support[i], X_dummy.support[i + 1]))
-            meanval += val
-        meanval = simplify(meanval)
-        if cache:
-            random_variable.add_to_cache("mean", meanval)
-        return simplify(meanval)
-
-    # If the random variable is a discrete function, find and return the mean
-    if X_dummy.is_discrete_functional():
-        # Create list of x*f(x)
-        meanfunc = []
-        for i in range(len(X_dummy.func)):
-            meanfunc.append(x * X_dummy.func[i])
-        # Sum to find the mean
-        meanval = 0
-        for i in range(len(X_dummy.func)):
-            val = Sum(meanfunc[i], (x, X_dummy.support[i], X_dummy.support[i + 1])).doit()
-            meanval += val
-        meanval = simplify(meanval)
-        if cache:
-            random_variable.add_to_cache("mean", meanval)
-        return simplify(meanval)
-
-    # If the random variable is discrete, find and return the variance
-    if X_dummy.is_discrete():
-        fast_rv = FastRV(
-            function=random_variable.func,
-            support=random_variable.support,
-            functional_form=random_variable.functional_form,
-            domain_type="discrete",
-        )
-        return fast_rv.mean()
-
-
-def MGF(random_variable, cache=False):
-    """
-    Procedure Name: MGF
-    Purpose: Compute the moment generating function of a random variable
-    Arguments:  1. random_variable: A random variable
-    Output:     1. The moment generating function
-    """
-    # If the MGF of the random variable is already cached in memory,
-    #   retriew the value of the MGF and return in.
-    if random_variable.cache is not None and "mgf" in random_variable.cache:
-        return random_variable.cache["mgf"]
-
-    mgf = ExpectedValue(random_variable, exp(t * x))
-    mgf = simplify(mgf)
-    if cache:
-        random_variable.add_to_cache("mgf", mgf)
-    return mgf
+        return pdf(X_final)
 
 
 def MinimumIID(random_variable, n):
@@ -2361,7 +1205,7 @@ def MinimumIID(random_variable, n):
         X_final = X_dummy
         for i in range(n - 1):
             X_final = Minimum(X_final, X_dummy)
-        return PDF(X_final)
+        return pdf(X_final)
 
 
 def OrderStat(random_variable, n, r, replace="w"):
@@ -2388,9 +1232,9 @@ def OrderStat(random_variable, n, r, replace="w"):
             err_string += "for continuous random variables"
             raise RVError(err_string)
         # Compute the PDF, CDF and SF of the random variable
-        pdf_dummy = PDF(random_variable)
-        cdf_dummy = CDF(random_variable)
-        sf_dummy = SF(random_variable)
+        pdf_dummy = pdf(random_variable)
+        cdf_dummy = cdf(random_variable)
+        sf_dummy = sf(random_variable)
         # Compute the factorial constant
         const = (factorial(n)) / (factorial(r - 1) * factorial(n - r))
         # Compute the distribution of the order statistic for each
@@ -2419,9 +1263,9 @@ def OrderStat(random_variable, n, r, replace="w"):
     # If the distribution is continuous, find and return the value of
     #   the order statistic
     if random_variable.is_discrete():
-        fx = PDF(random_variable)
-        Fx = CDF(random_variable)
-        Sx = SF(random_variable)
+        fx = pdf(random_variable)
+        Fx = cdf(random_variable)
+        Sx = sf(random_variable)
         N = len(fx.support)
         # With replacement
         if replace == "w":
@@ -2576,11 +1420,11 @@ def ProductIID(random_variable, n):
         raise RVError("The second argument must be an integer")
 
     # Compute the iid convolution
-    X_dummy = PDF(random_variable)
+    X_dummy = pdf(random_variable)
     X_final = X_dummy
     for i in range(n - 1):
         X_final *= X_dummy
-    return PDF(X_final)
+    return pdf(X_final)
 
 
 def RangeStat(random_variable, n, replace="w"):
@@ -2599,7 +1443,7 @@ def RangeStat(random_variable, n, replace="w"):
     if replace not in ["w", "wo"]:
         raise RVError("Replace must be w or wo")
     # Convert the random variable to its PDF form
-    fX = PDF(random_variable)
+    fX = pdf(random_variable)
     # If the random variable is continuous and its CDF is tractable,
     #   find the PDF of the range statistic
     z = Symbol("z")
@@ -2608,7 +1452,7 @@ def RangeStat(random_variable, n, replace="w"):
             err_string = "OrderStat without replacement not implemented "
             err_string += "for continuous random variables"
             raise RVError(err_string)
-        FX = CDF(random_variable)
+        FX = cdf(random_variable)
         nsegs = len(FX.func)
         fXRange = []
         for i in range(nsegs):
@@ -2637,8 +1481,8 @@ def RangeStat(random_variable, n, replace="w"):
     # If the reandom variable is discrete explicit, find and return the
     #   range stat
     if fX.is_discrete():
-        fX = PDF(random_variable)
-        FX = CDF(random_variable)
+        fX = pdf(random_variable)
+        FX = cdf(random_variable)
         N = len(fX.support)
         if N < 2:
             err_string = "The population only consists of 1 element"
@@ -2722,37 +1566,6 @@ def RangeStat(random_variable, n, replace="w"):
                 )
 
 
-def Skewness(random_variable, cache=False):
-    """
-    Procedure Name: Skewness
-    Purpose: Compute the skewness of a random variable
-    Arguments:  1. random_variable: A random variable
-    Output:     1. The skewness of the random variable
-    """
-    # If the input is a list of data, compute the Skewness
-    #   for the data set
-    if isinstance(random_variable, list):
-        Xstar = BootstrapRV(random_variable)
-        return Skewness(Xstar)
-
-    # If the skewness of the random variable is already cached in memory,
-    #   retriew the value of the skewness and return in.
-    if random_variable.cache is not None and "skewness" in random_variable.cache:
-        return random_variable.cache["skewness"]
-
-    # Compute the skewness
-    expect = Mean(random_variable)
-    sig = sqrt(Variance(random_variable))
-    Term1 = ExpectedValue(random_variable, x**3)
-    Term2 = 3 * expect * ExpectedValue(random_variable, x**2)
-    Term3 = 2 * expect**3
-    skew = (Term1 - Term2 + Term3) / (sig**3)
-    skew = simplify(skew)
-    if cache:
-        random_variable.add_to_cache("skewness", skew)
-    return simplify(skew)
-
-
 def Sqrt(random_variable):
     """
     Procedure Name: Sqrt
@@ -2786,7 +1599,7 @@ def Transform(random_variable, gXt):
             raise RVError("Transform support is not in ascending order")
 
     # Convert the RV to its PDF form
-    X_dummy = PDF(random_variable)
+    X_dummy = pdf(random_variable)
 
     # If the distribution is continuous, find and return the transformation
     if random_variable.is_continuous():
@@ -3013,14 +1826,14 @@ def Truncate(random_variable, supp):
         raise RVError("The support must be given in ascending order")
 
     # Conver the random variable to its pdf form
-    X_dummy = PDF(random_variable)
-    cdf_dummy = CDF(random_variable)
+    X_dummy = pdf(random_variable)
+    cdf_dummy = cdf(random_variable)
 
     # If the random variable is continuous, find and return
     #   the truncated random variable
     if random_variable.is_continuous():
         # Find the area of the truncated random variable
-        area = CDF(cdf_dummy, supp[1]) - CDF(cdf_dummy, supp[0])
+        area = cdf(cdf_dummy, supp[1]) - cdf(cdf_dummy, supp[0])
         # area=0
         # for i in range(len(X_dummy.func)):
         #    val=integrate(X_dummy.func[i],(x,X_dummy.support[i],
@@ -3053,7 +1866,7 @@ def Truncate(random_variable, supp):
     #   the truncated random variable
     if random_variable.is_discrete_functional():
         # Find the area of the truncated random variable
-        area = CDF(cdf_dummy, supp[1]) - CDF(cdf_dummy, supp[0])
+        area = cdf(cdf_dummy, supp[1]) - cdf(cdf_dummy, supp[0])
         # Cut out parts of the distribution that don't fall
         #   within the new limits
         for i in range(len(X_dummy.func)):
@@ -3098,79 +1911,6 @@ def Truncate(random_variable, supp):
         return RV(truncfunc, truncsupp, ["discrete", "pdf"])
 
 
-def Variance(random_variable, cache=False):
-    """
-    Procedure Name: Variance
-    Purpose: Compute the variance of a random variable
-    Arguments: 1. random_variable: A random variable
-    Output:    1. The variance of a random variable
-    """
-    # If the input is a list of data, compute the variance
-    #   for the data set
-    if isinstance(random_variable, list):
-        Xstar = BootstrapRV(random_variable)
-        return Variance(Xstar)
-
-    # If the variance of the random variable is already cached in memory,
-    #   retriew the value of the variance and return in.
-    if random_variable.cache is not None and "variance" in random_variable.cache:
-        return random_variable.cache["variance"]
-
-    # Find the PDF of the random variable
-    X_dummy = PDF(random_variable)
-    # If the random variable is continuous, find and return the variance
-    if X_dummy.is_continuous():
-        # Find the mean of the random variable
-        EX = Mean(X_dummy)
-        # Find E(X^2)
-        # Create list of (x**2)*f(x)
-        varfunc = []
-        for i in range(len(X_dummy.func)):
-            varfunc.append((x**2) * X_dummy.func[i])
-        # Integrate to find E(X^2)
-        exxval = 0
-        for i in range(len(X_dummy.func)):
-            val = integrate(varfunc[i], (x, X_dummy.support[i], X_dummy.support[i + 1]))
-            exxval += val
-        # Find Var(X)=E(X^2)-E(X)^2
-        var = exxval - (EX**2)
-        var = simplify(var)
-        if cache:
-            random_variable.add_to_cache("variance", var)
-        return simplify(var)
-
-    # If the random variable is a discrete function, find and return
-    # the variance
-    if X_dummy.is_discrete_functional():
-        # Find the mean of the random variable
-        EX = Mean(X_dummy)
-        # Find E(X^2)
-        # Create list of (x**2)*f(x)
-        varfunc = []
-        for i in range(len(X_dummy.func)):
-            varfunc.append((x**2) * X_dummy.func[i])
-        # Sum to find E(X^2)
-        exxval = 0
-        for i in range(len(X_dummy.func)):
-            val = summation(varfunc[i], (x, X_dummy.support[i], X_dummy.support[i + 1]))
-            exxval += val
-        # Find Var(X)=E(X^2)-E(X)^2
-        var = exxval - (EX**2)
-        var = simplify(var)
-        if cache:
-            random_variable.add_to_cache("variance", var)
-        return simplify(var)
-
-    if X_dummy.is_discrete():
-        fast_rv = FastRV(
-            function=random_variable.func,
-            support=random_variable.support,
-            functional_form=random_variable.functional_form,
-            domain_type=random_variable.domain_type,
-        )
-        return fast_rv.variance()
-
-
 def VerifyPDF(random_variable):
     """
     Procedure Name: VerifyPDF
@@ -3211,8 +1951,8 @@ def Convolution(random_variable_1, random_variable_2):
             raise RVError("Both random variables must have the same type")
 
     # Convert both random variables to their PDF form
-    X1_dummy = PDF(random_variable_1)
-    X2_dummy = PDF(random_variable_2)
+    X1_dummy = pdf(random_variable_1)
+    X2_dummy = pdf(random_variable_2)
 
     # If the distributions are continuous, find and return the convolution
     #   of the two random variables
@@ -3276,8 +2016,8 @@ def Convolution(random_variable_1, random_variable_2):
     #   of the two random variables.
     if random_variable_1.is_discrete():
         # Convert each random variable to its pdf form
-        X1_dummy = PDF(random_variable_1)
-        X2_dummy = PDF(random_variable_2)
+        X1_dummy = pdf(random_variable_1)
+        X2_dummy = pdf(random_variable_2)
         # Create function and support lists for the convolution of the
         #   two random variables
         convlist = []
@@ -3350,16 +2090,16 @@ def MaximumRV(random_variable_1, random_variable_2):
         # X2_dummy.drop_assumptions()
         # Special case for lifetime distributions
         if random_variable_1.support == [0, oo] and random_variable_2.support == [0, oo]:
-            cdf_dummy1 = CDF(random_variable_1)
-            cdf_dummy2 = CDF(random_variable_2)
+            cdf_dummy1 = cdf(random_variable_1)
+            cdf_dummy2 = cdf(random_variable_2)
             cdf1 = cdf_dummy1.func[0]
             cdf2 = cdf_dummy2.func[0]
             maxfunc = cdf1 * cdf2
-            return PDF(RV(simplify(maxfunc), [0, oo], ["continuous", "cdf"]))
+            return pdf(RV(simplify(maxfunc), [0, oo], ["continuous", "cdf"]))
         # Otherwise, compute the max using the full algorithm
         # Set up the support for X
-        Fx = CDF(random_variable_1)
-        Fy = CDF(random_variable_2)
+        Fx = cdf(random_variable_1)
+        Fy = cdf(random_variable_2)
         # Create a support list for the
         max_supp = []
         for i in range(len(Fx.support)):
@@ -3390,7 +2130,7 @@ def MaximumRV(random_variable_1, random_variable_2):
                     currFy = Fy.func[j]
             Fmax = currFx * currFy
             max_func.append(simplify(Fmax))
-        return PDF(RV(max_func, max_supp2, ["continuous", "cdf"]))
+        return pdf(RV(max_func, max_supp2, ["continuous", "cdf"]))
 
     # If the two random variables are discrete in functinonal form,
     #   find and return the maximum of the two random variables
@@ -3413,8 +2153,8 @@ def MaximumRV(random_variable_1, random_variable_2):
     #   the maximum of the two rv's
     if random_variable_1.is_discrete():
         # Convert X and Y to their PDF representations
-        fx = PDF(random_variable_1)
-        fy = PDF(random_variable_2)
+        fx = pdf(random_variable_1)
+        fy = pdf(random_variable_2)
         # Make a list of possible combinations of X and Y
         combo_list = []
         prob_list = []
@@ -3428,7 +2168,7 @@ def MaximumRV(random_variable_1, random_variable_2):
         # as being in the support
         # prob_list=[]
         # for i in range(len(combo_list)):
-        #    val=PDF(fx,combo_list[i][0])*PDF(fy,combo_list[j][1])
+        #    val=pdf(fx,combo_list[i][0])*pdf(fy,combo_list[j][1])
         #    prob_list.append(val)
 
         # Find the max value for each combo
@@ -3454,7 +2194,7 @@ def MaximumRV(random_variable_1, random_variable_2):
             max_supp.append(zip_list[i][0])
             max_func.append(zip_list[i][1])
         # Return the minimum random variable
-        return PDF(RV(max_func, max_supp, ["discrete", "pdf"]))
+        return pdf(RV(max_func, max_supp, ["discrete", "pdf"]))
 
 
 def Minimum(*argv):
@@ -3500,15 +2240,15 @@ def MinimumRV(random_variable_1, random_variable_2):
         # X2_dummy.drop_assumptions()
         # Special case for lifetime distributions
         if random_variable_1.support == [0, oo] and random_variable_2.support == [0, oo]:
-            sf_dummy1 = SF(random_variable_1)
-            sf_dummy2 = SF(random_variable_2)
+            sf_dummy1 = sf(random_variable_1)
+            sf_dummy2 = sf(random_variable_2)
             sf1 = sf_dummy1.func[0]
             sf2 = sf_dummy2.func[0]
             minfunc = 1 - (sf1 * sf2)
-            return PDF(RV(simplify(minfunc), [0, oo], ["continuous", "cdf"]))
+            return pdf(RV(simplify(minfunc), [0, oo], ["continuous", "cdf"]))
         # Otherwise, compute the min using the full algorithm
-        Fx = CDF(random_variable_1)
-        Fy = CDF(random_variable_2)
+        Fx = cdf(random_variable_1)
+        Fy = cdf(random_variable_2)
         # Create a support list for the
         min_supp = []
         for i in range(len(Fx.support)):
@@ -3543,7 +2283,7 @@ def MinimumRV(random_variable_1, random_variable_2):
             min_func.append(simplify(Fmin))
 
         # Return the random variable
-        return PDF(RV(min_func, min_supp2, ["continuous", "cdf"]))
+        return pdf(RV(min_func, min_supp2, ["continuous", "cdf"]))
 
     # If the two random variables are discrete in functinonal form,
     #   find and return the minimum of the two random variables
@@ -3566,8 +2306,8 @@ def MinimumRV(random_variable_1, random_variable_2):
     #   the minimum of the two rv's
     if random_variable_1.is_discrete():
         # Convert X and Y to their PDF representations
-        fx = PDF(random_variable_1)
-        fy = PDF(random_variable_2)
+        fx = pdf(random_variable_1)
+        fy = pdf(random_variable_2)
         # Make a list of possible combinations of X and Y
         combo_list = []
         prob_list = []
@@ -3581,7 +2321,7 @@ def MinimumRV(random_variable_1, random_variable_2):
         # as being in the support
         # prob_list=[]
         # for i in range(len(combo_list)):
-        #    val=PDF(fx,combo_list[i][0])*PDF(fy,combo_list[j][1])
+        #    val=pdf(fx,combo_list[i][0])*pdf(fy,combo_list[j][1])
         #    prob_list.append(val)
         # Find the min value for each combo
 
@@ -3607,7 +2347,7 @@ def MinimumRV(random_variable_1, random_variable_2):
             min_supp.append(zip_list[i][0])
             min_func.append(zip_list[i][1])
         # Return the minimum random variable
-        return PDF(RV(min_func, min_supp, ["discrete", "pdf"]))
+        return pdf(RV(min_func, min_supp, ["discrete", "pdf"]))
 
 
 def Mixture(MixParameters, MixRVs):
@@ -3644,7 +2384,7 @@ def Mixture(MixParameters, MixRVs):
     # Convert the Mix RVs to their PDF form
     Mixfx = []
     for i in range(len(MixRVs)):
-        Mixfx.append(PDF(MixRVs[i]))
+        Mixfx.append(pdf(MixRVs[i]))
 
     # If the distributions are continuous, find and return the
     #   mixture pdf
@@ -3728,7 +2468,7 @@ def Product(random_variable_1, random_variable_2):
         # X2_dummy.drop_assumptions()
         v = Symbol("v", positive=True)
         # Place zero in the support of X if it is not there already
-        X1 = PDF(random_variable_1)
+        X1 = pdf(random_variable_1)
         xfunc = []
         xsupp = []
         for i in range(len(X1.func)):
@@ -3741,7 +2481,7 @@ def Product(random_variable_1, random_variable_2):
         xsupp.append(X1.support[len(X1.support) - 1])
         X_dummy = RV(xfunc, xsupp, ["continuous", "pdf"])
         # Place zero in the support of Y if it is not already there
-        Y1 = PDF(random_variable_2)
+        Y1 = pdf(random_variable_2)
         yfunc = []
         ysupp = []
         for i in range(len(Y1.func)):
@@ -4053,8 +2793,8 @@ def Product(random_variable_1, random_variable_2):
     #   of the two random variables.
     if random_variable_1.is_discrete():
         # Convert each random variable to its pdf form
-        X1_dummy = PDF(random_variable_1)
-        X2_dummy = PDF(random_variable_2)
+        X1_dummy = pdf(random_variable_1)
+        X2_dummy = pdf(random_variable_2)
         # Create function and support lists for the product of the
         #   two random variables
         prodlist = []
@@ -4097,8 +2837,8 @@ def ProductDiscrete(random_variable_1, random_variable_2):
     if not random_variable_1.is_discrete() or not random_variable_2.is_discrete():
         raise RVError("both random variables must be discrete")
     # Convert both random variables to pdf form
-    X_dummy1 = PDF(random_variable_1)
-    X_dummy2 = PDF(random_variable_2)
+    X_dummy1 = pdf(random_variable_1)
+    X_dummy2 = pdf(random_variable_2)
     # Convert the support and the value of each random variable
     #   into numpy arrays
     support1 = np.asarray(X_dummy1.support, dtype=object)
@@ -4344,10 +3084,7 @@ def PlotDist(random_variable, suplist=None, opt=None, color="r", display=True):
         #    plt.ion()
         # plt.mat_plot(plot_func,plotsupp,lab1,lab2,'continuous')
 
-    if (
-        random_variable.is_discrete()
-        or random_variable.is_discrete_functional()
-    ):
+    if random_variable.is_discrete() or random_variable.is_discrete_functional():
         if random_variable.is_discrete_functional():
             if random_variable.support[-1] != oo:
                 random_variable = Convert(random_variable)
@@ -4355,7 +3092,7 @@ def PlotDist(random_variable, suplist=None, opt=None, color="r", display=True):
                 p = 1
                 i = random_variable.support[0]
                 while p > 0.00001:
-                    p = PDF(random_variable, i).evalf()
+                    p = pdf(random_variable, i).evalf()
                     i += 1
                 newsupport = random_variable.support
                 newsupport[-1] = i
@@ -4397,7 +3134,7 @@ def PlotEmpCDF(data):
 
     # Create a bootstrap random variable from the data
     Xstar = BootstrapRV(data)
-    PlotDist(CDF(Xstar), opt="EMPCDF")
+    PlotDist(cdf(Xstar), opt="EMPCDF")
 
 
 def PPPlot(random_variable, sample):
@@ -4425,15 +3162,15 @@ def PPPlot(random_variable, sample):
 
     # Create a list of CDF values for the sample and the
     # theoretical model
-    FX = CDF(random_variable)
+    FX = cdf(random_variable)
     fxstar = BootstrapRV(sample)
-    FXstar = CDF(fxstar)
+    FXstar = cdf(fxstar)
 
     FittedCDF = []
     ObservedCDF = []
     for i in range(len(plist)):
-        FittedCDF.append(CDF(FX, sample[i]))
-        ObservedCDF.append(CDF(FXstar, sample[i]))
+        FittedCDF.append(cdf(FX, sample[i]))
+        ObservedCDF.append(cdf(FXstar, sample[i]))
 
     # Plot the results
     plt.ion()

@@ -19,6 +19,8 @@ A Probability Progamming Language (APPL) -- Python Edition
 from sympy import *
 
 from .rv import *
+from .conversion import *
+from .moments import *
 from .stoch import *
 from .appl_plot import *
 from .distributions.continuous import *
@@ -60,17 +62,17 @@ def Menu():
     print("")
 
     print("Functional Form Conversion")
-    print("CDF(X,{x}),CHF(X,{x}),HF(X,{x}),IDF(X,{x})")
-    print("PDF(X,{x}),SF(X,{x}),BootstrapRV([data])")
+    print("cdf(X,{x}),chf(X,{x}),hf(X,{x}),idf(X,{x})")
+    print("pdf(X,{x}),sf(X,{x}),BootstrapRV([data])")
     print("Convert(X,{x})")
     print("")
 
     print("Procedures on One Random Variable")
-    print("ConvolutionIID(X,n),CoefOfVar(X),ExpectedValue(X,gx)")
-    print("Kurtosis(X),MaximumIID(X,n),Mean(X),MGF(X)")
+    print("ConvolutionIID(X,n),coef_of_var(X),expected_value(X,gx)")
+    print("kurtosis(X),MaximumIID(X,n),mean(X),mgf(X)")
     print("MinimumIID(X,n),OrderStat(X,n,r),ProductIID(X,n)")
-    print("Skewness(X),Transform(X,gX),Truncate(X,[x1,x2])")
-    print("Variance(X)")
+    print("skewness(X),Transform(X,gX),Truncate(X,[x1,x2])")
+    print("variance(X)")
     print("")
 
     print("Procedures on Two Random Variables")
