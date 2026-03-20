@@ -42,6 +42,75 @@ pub fn discrete_order_stat_py(
     Ok(fast_rv)
 }
 
+#[pyfunction(name = "discrete_range_stat", signature = (random_variable, n, replace="w"))]
+pub fn discrete_range_stat_py(
+    random_variable: &Bound<'_, PyAny>,
+    n: u64,
+    replace: &str,
+) -> PyResult<FastRV> {
+    let random_variable: FastRV = random_variable.extract()?;
+
+    let variant = match replace {
+        "w" => order_stat::OrderStatVariant::WithReplacement,
+        "wo" => order_stat::OrderStatVariant::WithoutReplacement,
+        _ => {
+            return Err(PyValueError::new_err(
+                "Invalid OrderStatVariant: expected 'w' or 'wo'",
+            ));
+        }
+    };
+
+    let range_stat_rv = order_stat::discrete_range_stat(&random_variable.inner, n, variant)
+        .map_err(PyValueError::new_err)?;
+
+    let fast_rv = FastRV::new(
+        range_stat_rv.function,
+        range_stat_rv.support,
+        range_stat_rv.functional_form,
+        range_stat_rv.domain_type,
+    );
+
+    Ok(fast_rv)
+}
+
+#[pyfunction(name = "discrete_maximum", signature = (random_variable_1, random_variable_2))]
+pub fn discrete_maximum_py(
+    random_variable_1: &Bound<'_, PyAny>,
+    random_variable_2: &Bound<'_, PyAny>,
+) -> PyResult<FastRV> {
+    let random_variable_1: FastRV = random_variable_1.extract()?;
+    let random_variable_2: FastRV = random_variable_2.extract()?;
+
+    let max_rv = order_stat::discrete_maximum(&random_variable_1.inner, &random_variable_2.inner)
+        .map_err(PyValueError::new_err)?;
+
+    Ok(FastRV::new(
+        max_rv.function,
+        max_rv.support,
+        max_rv.functional_form,
+        max_rv.domain_type,
+    ))
+}
+
+#[pyfunction(name = "discrete_minimum", signature = (random_variable_1, random_variable_2))]
+pub fn discrete_minimum_py(
+    random_variable_1: &Bound<'_, PyAny>,
+    random_variable_2: &Bound<'_, PyAny>,
+) -> PyResult<FastRV> {
+    let random_variable_1: FastRV = random_variable_1.extract()?;
+    let random_variable_2: FastRV = random_variable_2.extract()?;
+
+    let min_rv = order_stat::discrete_minimum(&random_variable_1.inner, &random_variable_2.inner)
+        .map_err(PyValueError::new_err)?;
+
+    Ok(FastRV::new(
+        min_rv.function,
+        min_rv.support,
+        min_rv.functional_form,
+        min_rv.domain_type,
+    ))
+}
+
 #[pyfunction(name = "next_combination", signature = (previous, n))]
 pub fn next_combination_py(previous: Vec<usize>, n: usize) -> PyResult<Option<Vec<usize>>> {
     if previous.is_empty() {

@@ -20,9 +20,26 @@ def dummy_ping():
     """Return a constant string from the Rust extension."""
     return _extension_module().dummy_ping()
 
+
 def discrete_order_stat(random_variable, n, r, replace):
-    """Return the next lexicographical permutation."""
+    """Return the discrete order statistic random variable."""
     return _extension_module().discrete_order_stat(random_variable, n, r, replace)
+
+
+def discrete_range_stat(random_variable, n, replace):
+    """Return the discrete range statistic random variable."""
+    return _extension_module().discrete_range_stat(random_variable, n, replace)
+
+
+def discrete_maximum(random_variable_1, random_variable_2):
+    """Return the discrete maximum of two random variables."""
+    return _extension_module().discrete_maximum(random_variable_1, random_variable_2)
+
+
+def discrete_minimum(random_variable_1, random_variable_2):
+    """Return the discrete minimum of two random variables."""
+    return _extension_module().discrete_minimum(random_variable_1, random_variable_2)
+
 
 def next_combination(previous, n):
     """Return the next lexicographical combination."""
