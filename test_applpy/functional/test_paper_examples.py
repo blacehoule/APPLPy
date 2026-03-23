@@ -2,9 +2,9 @@ import pytest
 from sympy import Rational, Symbol, sqrt
 
 from applpy import (
-    BootstrapRV,
+    bootstrap_rv,
     ChiRV,
-    ConvolutionIID,
+    convolution_iid,
     ExponentialRV,
     kurtosis,
     MarkovChain,
@@ -28,7 +28,7 @@ def test_exponential_sum_example_from_paper():
 def test_discrete_convolution_moments_from_paper():
     x = Symbol("x")
     x_rv = RV([x / 21], [1, 6], ["Discrete", "pdf"])
-    y_rv = ConvolutionIID(x_rv, 5)
+    y_rv = convolution_iid(x_rv, 5)
 
     assert mean(y_rv) == Rational(65, 3)
     assert variance(y_rv) == Rational(100, 9)
@@ -91,9 +91,9 @@ def test_bootstrap_system_means_from_paper():
         0.7694,
     ]
 
-    a_rv = BootstrapRV(alist)
-    b_rv = BootstrapRV(blist)
-    c_rv = BootstrapRV(clist)
+    a_rv = bootstrap_rv(alist)
+    b_rv = bootstrap_rv(blist)
+    c_rv = bootstrap_rv(clist)
 
     s_star = Minimum(MaximumIID(a_rv, 2), Minimum(MaximumIID(b_rv, 2), MaximumIID(c_rv, 2)))
     s_star_1 = Minimum(MaximumIID(a_rv, 3), MaximumIID(b_rv, 3), MaximumIID(c_rv, 3))

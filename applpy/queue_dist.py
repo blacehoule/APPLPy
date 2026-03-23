@@ -22,12 +22,10 @@ from sympy import (
 )
 from mpmath import nsum, nprod
 import numpy as np
-from .rv import (
-    RVError,
-    mean,
-    Convolution,
-    Mixture,
-)
+from .algebra import convolution
+from .moments import mean
+from .rv import RVError
+from .transform import mixture
 from .distributions.continuous import ErlangRV
 
 x, y, z, t, v = symbols("x y z t v")
@@ -95,7 +93,7 @@ def Queue(X, Y, n, k=0, s=1):
     for element in probs:
         sub_element = element.subs(rho, rho_subs)
         sub_probs.append(sub_element)
-    TIS = Mixture(sub_probs, lst)
+    TIS = mixture(sub_probs, lst)
     return TIS
 
 
@@ -155,7 +153,7 @@ def BuildDist(X, Y, n, k, s):
             if i <= s or s > n + k:
                 lst.append(Y)
             else:
-                lst.append(Convolution(ErlangRV(s * (1 / meany), i - s), Y))
+                lst.append(convolution(ErlangRV(s * (1 / meany), i - s), Y))
     return lst
 
 

@@ -1,7 +1,48 @@
-from sympy import *
+from sympy import Rational, Symbol, init_session, oo
+import matplotlib.pyplot as plt
 
 init_session()
-from applpy import *
+from applpy import (
+    MarkovChain,
+    Maximum,
+    MaximumIID,
+    Minimum,
+    OrderStat,
+    RV,
+    cdf,
+    convolution,
+    convolution_iid,
+    plot_dist,
+    product,
+    product_iid,
+    x,
+)
+from applpy.bayes import CredibleSet, Posterior
+from applpy.distributions.continuous import (
+    BetaRV,
+    ExponentialRV,
+    NormalRV,
+    TriangularRV,
+    UniformRV,
+    WeibullRV,
+)
+from applpy.distributions.discrete import BinomialRV
+from applpy.moments import (
+    coef_of_var,
+    expected_value,
+    kurtosis,
+    mean,
+    mgf,
+    skewness,
+    variance,
+)
+from applpy.queue_dist import Queue
+from applpy.rv import bootstrap_rv
+from applpy.stats import KSTest, MLE, MOM
+from applpy.transform import convert as Convert
+from applpy.transform import mixture as Mixture
+from applpy.transform import transform as Transform
+from applpy.transform import truncate as Truncate
 
 # Bayes
 theta = Symbol("theta")
@@ -22,33 +63,33 @@ P.display()
 
 X = NormalRV(2, 2)
 data = X.variate(n=10)
-Xstar = BootstrapRV(data)
+Xstar = bootstrap_rv(data)
 Xstar.display()
 
 # Converting RV Type
 
 X = NormalRV(2, 2)
-CDF(X, cache=True)
+cdf(X, cache=True)
 T = TriangularRV(2, 4, 6)
-HF(T).display()
-CDF(T, Rational(5, 2))
+hf(T).display()
+cdf(T, Rational(5, 2))
 
 # Expected Values
 X = WeibullRV()
-CoefOfVar(X)
+coef_of_var(X)
 X = NormalRV(2, 2)
-ExpectedValue(X, x**2)
+expected_value(X, x**2)
 X = BetaRV(2, 2)
-Kurtosis(X)
+kurtosis(X)
 X = ExponentialRV()
-Mean(X)
+mean(X)
 X = UniformRV()
-MGF(X)
+mgf(X)
 X = BetaRV(2, 3)
-Skewness(X)
+skewness(X)
 X = UniformRV()
 X = WeibullRV()
-Variance(X)
+variance(X)
 
 # Markov Chains
 Y = MarkovChain(P=[[0.97, 0.03], [0.04, 0.96]], init=[0.7, 0.3], states=["red", "blue"])
@@ -82,19 +123,17 @@ Y.display()
 X = TriangularRV(2, 4, 6)
 Y = TriangularRV(3, 5, 7)
 Z = Mixture([0.4, 0.6], [X, Y])
-PlotDist(Z)
-PlotDist(Z, color="g")
+plot_dist(Z)
+plot_dist(Z, color="g")
 
 X = ExponentialRV(1 / 3)
 Y = ExponentialRV(1 / 2)
-PlotDist(X, color="red")
-PlotDist(Y, color="blue")
-PlotLimits([0, 12], axis="x")
+plot_dist(X, color="red")
+plot_dist(Y, color="blue")
 
-PlotClear()
-Xstar = BootstrapRV(X.variate(n=100))
-PlotDist(CDF(X))
-PlotDist(CDF(Xstar))
+Xstar = bootstrap_rv(X.variate(n=100))
+plot_dist(cdf(X))
+plot_dist(cdf(Xstar))
 plt.title("Comparison of Exponential CDF and Bootstrapped EDF")
 
 # Queue
@@ -129,18 +168,18 @@ Z.display()
 
 U = UniformRV(Rational(1), Rational(2))
 U2 = UniformRV(Rational(3), Rational(4))
-Z = Convolution(U, U2)
+Z = convolution(U, U2)
 Z.display()
 
-Z = ConvolutionIID(U, 3)
+Z = convolution_iid(U, 3)
 Z.display()
 
 X = UniformRV(Rational(2), Rational(4))
 Y = UniformRV(Rational(3), Rational(5))
-Z = Product(X, Y)
+Z = product(X, Y)
 Z.display()
 
-Z = ProductIID(X, 3)
+Z = product_iid(X, 3)
 Z.display()
 
 # Random Variable Methods
@@ -159,7 +198,7 @@ T.display()
 T.latex()
 
 U = UniformRV(Rational(1), Rational(2))
-Z = ConvolutionIID(U, 3)
+Z = convolution_iid(U, 3)
 Z.display()
 Z.simplify()
 
@@ -169,8 +208,8 @@ Y = ExponentialRV(Rational(1, 4))
 Z = X + Y
 Z.save("conv.rv")
 
-X = LoadRV("conv.rv")
-X.display()
+# Loading serialized RVs is not demonstrated because a top-level loader API
+# is not currently exposed in this package version.
 
 # Statistics
 

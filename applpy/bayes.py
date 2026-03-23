@@ -23,7 +23,8 @@ from sympy import (
     ln,
     simplify,
 )
-from .rv import RV, RVError, Truncate
+from .rv import RV, RVError
+from .transform import truncate
 
 x, y, z, t = symbols("x y z t")
 
@@ -109,7 +110,7 @@ def Posterior(LikeRV, PriorRV, data=[], param=Symbol("theta")):
         else:
             PropPost = RV(FunctionList, PriorRV.support, ["continuous", "pdf"])
             # Normalize the posterior distribution
-            PostRV = Truncate(PropPost, [PriorRV.support[0], PriorRV.support[-1]])
+            PostRV = truncate(PropPost, [PriorRV.support[0], PriorRV.support[-1]])
         return PostRV
     # If the prior distribution is discrete and the likelihood function
     #   is continuous, compute the posterior distribution

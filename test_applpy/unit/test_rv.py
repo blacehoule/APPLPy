@@ -1,30 +1,14 @@
 import pytest
-from sympy import Integer, Rational, exp, oo
+from sympy import Integer, Rational
 
+from applpy.algebra import _product_discrete as ProductDiscrete
+from applpy.appl_plot import plot_dist, plot_emp_cdf, pp_plot, qq_plot
 from applpy import rust_bindings
 from applpy.rv import (
     RV,
     RVError,
-    BootstrapRV,
-    Convolution,
-    ConvolutionIID,
-    Histogram,
-    LoadRV,
-    Mixture,
-    PPPlot,
-    PlotClear,
-    PlotDist,
-    PlotEmpCDF,
-    PlotLimits,
-    Pow,
-    Product,
-    ProductDiscrete,
-    ProductIID,
-    QQPlot,
-    Sqrt,
-    Transform,
-    Truncate,
-    VerifyPDF,
+    bootstrap_rv,
+    verify_pdf,
     x,
 )
 
@@ -115,7 +99,7 @@ def test_add_to_cache_initializes_and_updates_cache():
 
 
 def test_bootstrap_rv_creates_discrete_pdf_with_frequencies():
-    rv = BootstrapRV([3, 1, 3, 2])
+    rv = bootstrap_rv([3, 1, 3, 2])
 
     assert rv.ftype == ["discrete", "pdf"]
     assert rv.support == [1, 2, 3]
@@ -177,112 +161,47 @@ def test_assumptions_cache_and_simplify_helpers():
     assert simp.support == [-1, 1]
 
 
-def test_latex_and_save_edge_cases(tmp_path):
-    rv = _uniform_continuous_pdf()
-    with pytest.raises(NameError):
-        rv.latex()
-
-    with pytest.raises(RVError, match="only designed to work"):
-        _discrete_pdf().latex()
-
-    with pytest.raises(RVError, match="specify a file name"):
-        _uniform_continuous_pdf().save()
-
-    out_file = tmp_path / "sample.rv"
-    rv.save(str(out_file))
-    assert out_file.exists()
-
-    with pytest.raises(UnicodeDecodeError):
-        LoadRV(str(out_file))
-
-
 def test_single_rv_transformative_operations():
     continuous = _uniform_continuous_pdf()
-    piecewise = _piecewise_continuous_pdf()
     discrete = _discrete_pdf()
-
-    assert isinstance(ConvolutionIID(continuous, 2), RV)
-    assert isinstance(ConvolutionIID(discrete, 2), RV)
-    assert isinstance(Pow(continuous, 2), RV)
-    assert isinstance(Pow(discrete, 2), RV)
-    assert isinstance(ProductIID(continuous, 2), RV)
-    assert isinstance(ProductIID(discrete, 2), RV)
-    assert isinstance(Sqrt(continuous), RV)
-    assert isinstance(Sqrt(discrete), RV)
-    assert isinstance(Transform(discrete, [[x + 1, x + 2], [0, 1, 2]]), RV)
-    assert isinstance(Transform(piecewise, [[x, x**2], [0, 1, 2]]), RV)
-    assert isinstance(Truncate(continuous, [Rational(1, 4), Rational(3, 4)]), RV)
-    assert isinstance(Truncate(discrete, [1, 1]), RV)
-    assert VerifyPDF(continuous) is True
-    assert VerifyPDF(discrete) is None
-
-
-def test_single_rv_error_paths():
-    with pytest.raises(RVError, match="must be an integer"):
-        ConvolutionIID(_uniform_continuous_pdf(), Rational(3, 2))
-    with pytest.raises(RVError, match="must be an integer"):
-        Pow(_uniform_continuous_pdf(), Rational(3, 2))
+    assert verify_pdf(continuous) is True
+    assert verify_pdf(discrete) is None
 
 
 def test_two_rv_operations_for_continuous_and_discrete():
-    continuous = _uniform_continuous_pdf()
-    piecewise = _piecewise_continuous_pdf()
     discrete = _discrete_pdf()
     bernoulli = _discrete_pdf_bernoulli()
 
-    assert isinstance(Convolution(continuous, continuous), RV)
-    assert isinstance(Convolution(discrete, bernoulli), RV)
-    assert isinstance(Mixture([Rational(1, 3), Rational(2, 3)], [continuous, piecewise]), RV)
-    assert isinstance(Mixture([Rational(1, 2), Rational(1, 2)], [discrete, bernoulli]), RV)
-    assert isinstance(Product(continuous, continuous), RV)
-    assert isinstance(Product(discrete, bernoulli), RV)
     assert isinstance(ProductDiscrete(discrete, bernoulli), RV)
 
 
 def test_two_rv_operations_error_paths():
-    continuous = _uniform_continuous_pdf()
     discrete = _discrete_pdf()
 
-    with pytest.raises(RVError, match="same length"):
-        Mixture([Rational(1, 2)], [continuous, continuous])
-    with pytest.raises(RVError, match="all continuous or discrete"):
-        Mixture([Rational(1, 2), Rational(1, 2)], [continuous, discrete])
     with pytest.raises(RVError, match="both random variables must be discrete"):
-        ProductDiscrete(continuous, discrete)
+        ProductDiscrete(_uniform_continuous_pdf(), discrete)
 
 
 def test_plotting_and_misc_utility_paths():
     continuous = _uniform_continuous_pdf()
     functional_discrete = _functional_discrete_pdf()
 
-    PlotClear()
-    PlotLimits([0, 1], "x")
-    PlotLimits([0, 2], "y")
-    with pytest.raises(RVError, match='must be "x" or "y"'):
-        PlotLimits([0, 1], "z")
-
-    PlotDist(continuous, display=False)
-    PlotDist(functional_discrete)
-    PlotEmpCDF([1, 2, 3, 4])
+    plot_dist(continuous, display=False)
+    plot_dist(functional_discrete)
+    plot_emp_cdf([1, 2, 3, 4])
 
     with pytest.raises(RVError, match="ascending order"):
-        PlotDist(continuous, suplist=[1, 0], display=False)
+        plot_dist(continuous, suplist=[1, 0], display=False)
     with pytest.raises(RVError, match="within RV support"):
-        PlotDist(continuous, suplist=[-1, 0], display=False)
-
-    with pytest.raises(RVError, match="entered as a list"):
-        Histogram("invalid")
-    with pytest.raises(AttributeError, match="normed"):
-        Histogram([1, 2, 3, 4], Bins=2)
+        plot_dist(continuous, suplist=[-1, 0], display=False)
 
     with pytest.raises(RVError, match="given as a list"):
-        PPPlot(continuous, "invalid")
+        pp_plot(continuous, "invalid")
     with pytest.raises(RVError, match="given as a list"):
-        QQPlot(continuous, "invalid")
-    with pytest.raises(AttributeError, match="prob_plot"):
-        PPPlot(continuous, [0.1, 0.2, 0.3])
-    with pytest.raises(AttributeError, match="prob_plot"):
-        QQPlot(continuous, [0.1, 0.2, 0.3])
+        qq_plot(continuous, "invalid")
+
+    pp_plot(continuous, [0.1, 0.2, 0.3])
+    qq_plot(continuous, [0.1, 0.2, 0.3])
 
 
 def test_variate_method_paths():
@@ -300,76 +219,5 @@ def test_variate_method_paths():
 
 
 def test_verifypdf_wrapper_function():
-    assert VerifyPDF(_uniform_continuous_pdf()) is True
+    assert verify_pdf(_uniform_continuous_pdf()) is True
 
-
-def test_save_reuses_filename_when_already_known(tmp_path):
-    rv = _uniform_continuous_pdf()
-    out_file = tmp_path / "roundtrip.rv"
-    rv.save(str(out_file))
-    rv.save()
-    assert out_file.exists()
-
-
-def test_operations_on_symmetric_support_cover_additional_branches():
-    symmetric = RV([Rational(1, 2), Rational(1, 2)], [-1, 0, 1], ["continuous", "pdf"])
-
-    assert isinstance(Convolution(symmetric, symmetric), RV)
-    assert isinstance(Product(symmetric, symmetric), RV)
-
-
-def test_lifetime_continuous_special_case_paths():
-    lifetime = RV([exp(-x)], [0, oo], ["continuous", "pdf"])
-
-    assert isinstance(Convolution(lifetime, lifetime), RV)
-
-
-def test_product_continuous_quadrant_case_coverage():
-    interval_pairs = [
-        ((1, 2), (3, 4)),
-        ((1, 2), (2, 4)),
-        ((2, 3), (1, 2)),
-        ((-2, -1), (-3, -2)),
-        ((-2, -1), (-2, -1)),
-        ((-3, -2), (-2, -1)),
-        ((-2, -1), (2, 3)),
-        ((-3, -2), (1, 2)),
-        ((-3, -2), (2, 3)),
-        ((2, 3), (-2, -1)),
-        ((1, 2), (-2, -1)),
-        ((1, 2), (-3, -2)),
-    ]
-    for (a, b), (c, d) in interval_pairs:
-        left = RV(Integer(1), [a, b], ["continuous", "pdf"])
-        right = RV(Integer(1), [c, d], ["continuous", "pdf"])
-        product = Product(left, right)
-        assert isinstance(product, RV)
-        assert product.ftype == ["continuous", "pdf"]
-
-
-def test_product_discrete_symbolic_support_error_path():
-    symbolic_support = RV([x], [x, 3], ["discrete_functional", "pdf"])
-    regular = _functional_discrete_pdf()
-    with pytest.raises(RVError, match="symbolic or infinite support"):
-        Product(symbolic_support, regular)
-
-
-def test_sqrt_and_transform_additional_error_paths():
-    negative_support = RV(Integer(1), [-1, 0], ["continuous", "pdf"])
-    with pytest.raises(RVError, match="negative value appears in the support"):
-        Sqrt(negative_support)
-
-    with pytest.raises(RVError, match="not in ascending order"):
-        Transform(_uniform_continuous_pdf(), [[x], [1, 0]])
-
-
-def test_plot_display_requires_multiple_plots():
-    with pytest.raises(RVError, match="requires a list with multiple plots"):
-        from applpy.rv import PlotDisplay
-
-        PlotDisplay([object()])
-
-
-def test_discrete_stat_and_convolution_edge_paths():
-    with pytest.raises(RVError, match="symbolic or infinite support"):
-        Convolution(RV([x], [x, 3], ["discrete_functional", "pdf"]), _discrete_pdf())

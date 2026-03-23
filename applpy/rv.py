@@ -1,66 +1,3 @@
-"""
-Main Random Variable Module
-
-1. The Random Variable class
-2. Procedures for changing functional form
-3. Operations on one random variable
-4. Operations on two random variables
-5. Plots
-
-Procedures On One Random Variable:
-    ConvolutionIID(random_variable,n)
-    ProductIID(random_variable,n)
-    Transform(random_variable,gX)
-    Truncate(random_variable,[lw,up])
-    variance(random_variable)
-    VerifyPDF(random_variable)
-
-Procedures On Two Random Variables:
-    Convolution(random_variable_1,random_variable_2)
-    Mixture(MixParameters,MixRVs)
-    Product(random_variable_1,random_variable_2)
-
-Plotting Procedures:
-    Histogram(sample,bins)
-    PlotDist(random_variable,suplist)
-    PlotDisplay(plot_list,suplist)
-    PlotEmpCDF(data)
-    PPPlot(random_variable,sample)
-    QQPlot(random_variable,sample)
-"""
-
-from applpy import rust_bindings
-
-from sympy import (
-    Symbol,
-    symbols,
-    oo,
-    integrate,
-    summation,
-    diff,
-    exp,
-    sqrt,
-    ln,
-    simplify,
-    solve,
-    nan,
-    pprint,
-    expand,
-    zoo,
-    latex,
-    Rational,
-    Float,
-    limit,
-)
-from random import random
-import numpy as np
-import pickle
-from enum import Enum
-
-import matplotlib.pylab as plt
-
-x, y, z, t = symbols("x y z t")
-
 # A Probability Progamming Language (APPL) -- Python Edition
 # Copyright (C) 2001,2002,2008,2010,2014 Andrew Glen, Larry
 # Leemis, Diane Evans, Matthew Robinson
@@ -76,6 +13,25 @@ x, y, z, t = symbols("x y z t")
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from applpy import rust_bindings
+
+from sympy import (
+    Symbol,
+    symbols,
+    oo,
+    integrate,
+    summation,
+    simplify,
+    pprint,
+    expand,
+    latex,
+    Rational,
+)
+from random import random
+from enum import Enum
+
+x, y, z, t = symbols("x y z t")
 
 
 class RVError(Exception):
@@ -304,8 +260,10 @@ class RV:
         Arguments:  1. self: the random variable
         Output:     1. The negative transformation of the random variable
         """
+        from .transform import transform
+
         gX = [[-x], [-oo, oo]]
-        neg = Transform(self, gX)
+        neg = transform(self, gX)
         return neg
 
     def __abs__(self):
@@ -316,8 +274,10 @@ class RV:
         Arguments:  1. self: the random variable
         Output:     1. The absolute value of the random variable
         """
+        from .transform import transform
+
         gX = [[abs(x)], [-oo, oo]]
-        abs_rv = Transform(self, gX)
+        abs_rv = transform(self, gX)
         return abs_rv
 
     def __add__(self, other):
@@ -333,18 +293,21 @@ class RV:
         """
         # If the random variable is added to another random variable,
         #   return the convolution of the two random variables
+        from .algebra import convolution
+        from .transform import transform
+
         if "RV" in other.__class__.__name__:
             try:
-                return Convolution(self, other)
+                return convolution(self, other)
             except Exception:
-                return Convolution(other, self)
+                return convolution(other, self)
             else:
                 raise RVError("Could not compute the convolution")
         # If the random variable is added to a constant, shift
         # the random variable
         if isinstance(other, (float, int)):
             gX = [[x + other], [-oo, oo]]
-            return Transform(self, gX)
+            return transform(self, gX)
 
     def __radd__(self, other):
         """
@@ -375,15 +338,18 @@ class RV:
         """
         # If the random variable is subtracted by another random variable,
         #   return the difference of the two random variables
+        from .algebra import convolution
+        from .transform import transform
+
         if "RV" in other.__class__.__name__:
             gX = [[-x], [-oo, oo]]
-            random_variable = Transform(other, gX)
-            return Convolution(self, random_variable)
+            random_variable = transform(other, gX)
+            return convolution(self, random_variable)
         # If the random variable is subtracted by a constant, shift
         # the random variable
         if isinstance(other, (float, int)):
             gX = [[x - other], [-oo, oo]]
-            return Transform(self, gX)
+            return transform(self, gX)
 
     def __rsub__(self, other):
         """
@@ -414,18 +380,21 @@ class RV:
         """
         # If the random variable is multiplied by another random variable,
         #   return the product of the two random variables
+        from .algebra import product
+        from .transform import transform
+
         if "RV" in other.__class__.__name__:
             try:
-                return Product(self, other)
+                return product(self, other)
             except Exception:
-                return Product(other, self)
+                return product(other, self)
             else:
                 raise RVError("Could not compute the product")
         # If the random variable is multiplied by a constant, scale
         # the random variable
         if isinstance(other, (float, int)):
             gX = [[x * other], [-oo, oo]]
-            return Transform(self, gX)
+            return transform(self, gX)
 
     def __rmul__(self, other):
         """
@@ -453,15 +422,18 @@ class RV:
         """
         # If the random variable is divided by another random variable,
         #   return the quotient of the two random variables
+        from .algebra import product
+        from .transform import transform
+
         if "RV" in other.__class__.__name__:
             gX = [[1 / x, 1 / x], [-oo, 0, oo]]
-            random_variable = Transform(other, gX)
-            return Product(self, random_variable)
+            random_variable = transform(other, gX)
+            return product(self, random_variable)
         # If the random variable is divided by a constant, scale
         # the random variable by theinverse of the constant
         if isinstance(other, (float, int)):
             gX = [[x / other], [-oo, oo]]
-            return Transform(self, gX)
+            return transform(self, gX)
 
     def __rtruediv__(self, other):
         """
@@ -475,8 +447,10 @@ class RV:
         Output:     1. A new random variable
         """
         ## Invert the random variable
+        from .transform import transform
+
         gX = [[1 / x, 1 / x], [-oo, 0, oo]]
-        invert = Transform(self, gX)
+        invert = transform(self, gX)
         ## Call the multiplication function
         div_rv = invert.__mul__(other)
         return div_rv
@@ -496,7 +470,9 @@ class RV:
             error_string += " integer value"
             raise RVError(error_string)
 
-        pow_rv = Pow(self, n)
+        from .transform import power
+
+        pow_rv = power(self, n)
         return pow_rv
 
     def __eq__(self, other):
@@ -676,29 +652,6 @@ class RV:
         p = eval(piece3)
         return latex(p)
 
-    def save(self, filename=None):
-        """
-        Procedure Name: save
-        Purpose: Saves a random variable to disk in binary format
-        Arguments:  1. self: the random variable
-                    2. filename: the name of the file that will
-                        store the random variable. If none is
-                        specified, the most recently used file
-                        name is used
-        Output:     1. The random variable is stored to disk
-        """
-        if filename is None:
-            if self.filename is None:
-                err_string = "Please specify a file name, this random "
-                err_string += "has never been saved before "
-                raise RVError(err_string)
-            else:
-                filename = self.filename
-        else:
-            self.filename = filename
-        fileObject = open(filename, "wb")
-        pickle.dump(self, fileObject)
-
     def simplify(self, assumption=None):
         """
         Procedure Name: simplify
@@ -744,6 +697,8 @@ class RV:
                         and a print statement indicating whether or not the
                         random variable is valid.
         """
+        from .conversion import pdf
+
         # If the random variable is continuous, verify the PDF
         if self.is_continuous():
             # Check to ensure that the distribution is fully
@@ -851,6 +806,9 @@ class RV:
                             convergence. (default is .1% of the mean)
         """
 
+        from .conversion import cdf, idf, pdf
+        from .moments import mean
+
         # Check to see if the user specified a valid method
         method_list = ["newton-raphson", "inverse"]
         if method not in method_list:
@@ -912,17 +870,6 @@ class RV:
         return varlist
 
 
-# Conversion Procedures:
-#     cdf(random_variable,value)
-#     chf(random_variable,value)
-#     hf(random_variable,value)
-#     idf(random_variable,value)
-#     pdf(random_variable,value)
-#     sf(random_variable,value)
-#     BootstrapRV(varlist)
-#     Convert(random_variable,inc)
-
-
 def check_value(value, sup):
     # Not intended for use by end user
     """
@@ -944,52 +891,7 @@ def check_value(value, sup):
             return True
 
 
-def cdf(random_variable, value=x, cache=False):
-    from .conversion import cdf as _cdf
-
-    return _cdf(random_variable, value=value, cache=cache)
-
-
-def chf(random_variable, value=x, cache=False):
-    from .conversion import chf as _chf
-
-    return _chf(random_variable, value=value, cache=cache)
-
-
-def hf(random_variable, value=x, cache=False):
-    from .conversion import hf as _hf
-
-    return _hf(random_variable, value=value, cache=cache)
-
-
-def idf(random_variable, value=x, cache=False):
-    from .conversion import idf as _idf
-
-    return _idf(random_variable, value=value, cache=cache)
-
-
-def pdf(random_variable, value=x, cache=False):
-    from .conversion import pdf as _pdf
-
-    return _pdf(random_variable, value=value, cache=cache)
-
-
-def sf(random_variable, value=x, cache=False):
-    from .conversion import sf as _sf
-
-    return _sf(random_variable, value=value, cache=cache)
-
-
-# Backward-compatible aliases
-CDF = cdf
-CHF = chf
-HF = hf
-IDF = idf
-PDF = pdf
-SF = sf
-
-
-def BootstrapRV(varlist, symbolic=False):
+def bootstrap_rv(varlist, symbolic=False):
     """
     Procedure Name: Bootstrap RV
     Purpose: Generate a discrete random variable from a list of variates
@@ -1014,529 +916,9 @@ def BootstrapRV(varlist, symbolic=False):
     return RV(funclist, supplist, ["discrete", "pdf"])
 
 
-def Convert(random_variable, inc=1):
+def verify_pdf(random_variable):
     """
-    Procedure Name: Convert
-    Purpose: Convert a discrete random variable from functional to
-                explicit form
-    Arguments:  1. random_variable: A functional discrete random variable
-                2. inc: An increment value
-    Output:     1. A discrete random variable in explicit form
-    """
-    # If the random variable is not in functional form, return
-    #   an error
-    if not random_variable.is_discrete_functional():
-        raise RVError("The random variable must be discrete_functional")
-    # If the rv has infinite support, return an error
-    if (oo or -oo) in random_variable.support:
-        raise RVError("Convert does not work for infinite support")
-    # Create the support of explicit discrete rv
-    i = random_variable.support[0]
-    discrete_supp = []
-    while i <= random_variable.support[1]:
-        discrete_supp.append(i)
-        i += inc
-    # Create the function values for the explicit rv
-    discrete_func = []
-    for i in range(len(discrete_supp)):
-        val = random_variable.func[0].subs(x, discrete_supp[i])
-        discrete_func.append(val)
-    # Return the random variable in discrete form
-    return RV(discrete_func, discrete_supp, ["discrete", random_variable.functional_form])
-
-
-# Procedures on One Random Variable
-#
-# Procedures:
-#     ConvolutionIID(random_variable,n)
-#     coef_of_var(random_variable)
-#     expected_value(random_variable,gX)
-#     entropy(random_variable)
-#     kurtosis(random_variable)
-#     mean(random_variable)
-#     mgf(random_variable)
-#     Power(Rvar,n)
-#     ProductIID(random_variable,n)
-#     skewness(random_variable)
-#     SqRt(random_variable)
-#     Transform(random_variable,gX)
-#     Truncate(random_variable,[lw,up])
-#     variance(random_variable)
-
-
-def ConvolutionIID(random_variable, n):
-    """
-    Procedure Name: ConvolutionIID
-    Purpose: Compute the convolution of n iid random variables
-    Arguments:  1. random_variable: A random variable
-                2. n: an integer
-    Output:     1. The convolution of n iid random variables
-    """
-    # Check to make sure n is an integer
-    if not isinstance(n, int):
-        raise RVError("The second argument must be an integer")
-
-    # Compute the iid convolution
-    X_dummy = pdf(random_variable)
-    X_final = X_dummy
-    for i in range(n - 1):
-        X_final += X_dummy
-    return pdf(X_final)
-
-
-def coef_of_var(random_variable, cache=False):
-    from .moments import coef_of_var as _CoefOfVar
-
-    return _CoefOfVar(random_variable, cache=cache)
-
-
-def expected_value(random_variable, gX=x):
-    from .moments import expected_value as _ExpectedValue
-
-    return _ExpectedValue(random_variable, gX=gX)
-
-
-def entropy(random_variable, cache=False):
-    from .moments import entropy as _Entropy
-
-    return _Entropy(random_variable, cache=cache)
-
-
-def kurtosis(random_variable, cache=False):
-    from .moments import kurtosis as _Kurtosis
-
-    return _Kurtosis(random_variable, cache=cache)
-
-
-def mean(random_variable, cache=False):
-    from .moments import mean as _Mean
-
-    return _Mean(random_variable, cache=cache)
-
-
-def mgf(random_variable, cache=False):
-    from .moments import mgf as _MGF
-
-    return _MGF(random_variable, cache=cache)
-
-
-def skewness(random_variable, cache=False):
-    from .moments import skewness as _Skewness
-
-    return _Skewness(random_variable, cache=cache)
-
-
-def variance(random_variable, cache=False):
-    from .moments import variance as _Variance
-
-    return _Variance(random_variable, cache=cache)
-
-
-# Backward-compatible aliases
-CoefOfVar = coef_of_var
-ExpectedValue = expected_value
-Entropy = entropy
-Kurtosis = kurtosis
-Mean = mean
-MGF = mgf
-Skewness = skewness
-Variance = variance
-
-
-def Pow(random_variable, n):
-    """
-    Procedure Name: Pow
-    Purpose: Compute the transformation of a random variable by an exponent
-    Arguments:  1. random_variable: A random variable
-                2. n: an integer
-    Output:     1. The transformation of the RV by x**n
-    """
-    if not isinstance(n, int):
-        err_str = "n must be an integer"
-        raise RVError(err_str)
-    # If n is even, then g is a two-to-one transformation
-    if n % 2 == 0:
-        g = [[x**n, x**n], [-oo, 0, oo]]
-    # If n is odd, the g is a one-to-one transformation
-    elif n % 2 == 1:
-        g = [[x**n], [-oo, oo]]
-    return Transform(random_variable, g)
-
-
-def ProductIID(random_variable, n):
-    """
-    Procedure Name: ProductIID
-    Purpose: Compute the product of n iid random variables
-    Arguments:  1. random_variable: A random variable
-                2. n: an integer
-    Output:     1. The product of n iid random variables
-    """
-    # Check to make sure n is an integer
-    if not isinstance(n, int):
-        raise RVError("The second argument must be an integer")
-
-    # Compute the iid convolution
-    X_dummy = pdf(random_variable)
-    X_final = X_dummy
-    for i in range(n - 1):
-        X_final *= X_dummy
-    return pdf(X_final)
-
-
-def RangeStat(random_variable, n, replace="w"):
-    from .order_stat import RangeStat as _RangeStat
-
-    return _RangeStat(random_variable, n, replace)
-
-
-def Sqrt(random_variable):
-    """
-    Procedure Name: Sqrt
-    Purpose: Computes the transformation of a random variable by sqrt(x)
-    Arguments:  1. random_variable: A random variable
-    Output:     1. The random variable transformed by sqrt(x)
-    """
-    for element in random_variable.support:
-        if element < 0:
-            err_string = "A negative value appears in the support of the"
-            err_string += " random variable."
-            raise RVError(err_string)
-    u = [[sqrt(x)], [0, oo]]
-    NewRvar = Transform(random_variable, u)
-    return NewRvar
-
-
-def Transform(random_variable, gXt):
-    """
-    Procedure Name: Transform
-    Purpose: Compute the transformation of a random variable
-                by a a function g(x)
-    Arguments:  1. random_variable: A random variable
-                2. gX: A transformation in list of two lists format
-    Output:     1. The transformation of random_variable
-    """
-
-    # Check to make sure support of transform is in ascending order
-    for i in range(len(gXt[1]) - 1):
-        if gXt[1][i] > gXt[1][i + 1]:
-            raise RVError("Transform support is not in ascending order")
-
-    # Convert the RV to its PDF form
-    X_dummy = pdf(random_variable)
-
-    # If the distribution is continuous, find and return the transformation
-    if random_variable.is_continuous():
-        # Adjust the transformation to include the support of the random
-        #   variable
-        gXold = []
-        for i in range(len(gXt)):
-            gXold.append(gXt[i])
-        gXsupp = []
-        for i in range(len(gXold[1])):
-            gXsupp.append(gXold[1][i])
-        # Add the support of the random variable into the support
-        #   of the transformation
-        for i in range(len(X_dummy.support)):
-            if X_dummy.support[i] not in gXsupp:
-                gXsupp.append(X_dummy.support[i])
-        gXsupp.sort()
-        # Find which segment of the transformation applies, and add it
-        #   to the transformation list
-        gXfunc = []
-        for i in range(1, len(gXsupp)):
-            for j in range(len(gXold[0])):
-                if gXsupp[i] >= gXold[1][j]:
-                    if gXsupp[i] <= gXold[1][j + 1]:
-                        gXfunc.append(gXold[0][j])
-                        break
-        # Set the adjusted transformation as gX
-        gX = []
-        gX.append(gXfunc)
-        gX.append(gXsupp)
-        # If the support of the transformation does not match up with the
-        #   support of the RV, adjust the support of the transformation
-
-        # Traverse list to find elements that are not within the support
-        #   of the rv
-        for i in range(len(gX[1])):
-            if gX[1][i] < X_dummy.support[0]:
-                gX[1][i] = X_dummy.support[0]
-            if gX[1][i] > X_dummy.support[len(X_dummy.support) - 1]:
-                gX[1][i] = X_dummy.support[len(X_dummy.support) - 1]
-        # Delete segments of the transformation that will not be used
-        gX0_removal = []
-        gX1_removal = []
-        for i in range(len(gX[0]) - 1):
-            if gX[1][i] == gX[1][i + 1]:
-                gX0_removal.append(i)
-                gX1_removal.append(i + 1)
-        for i in range(len(gX0_removal)):
-            index = gX0_removal[i]
-            del gX[0][index - i]
-        for i in range(len(gX1_removal)):
-            index = gX1_removal[i]
-            del gX[1][index - i]
-        # Create a list of mappings x->g(x)
-        mapping = []
-        for i in range(len(gX[0])):
-            gXsubs1 = gX[0][i].subs(x, gX[1][i])
-            if gXsubs1 == zoo:
-                gXsubs1 = limit(gX[0][i], x, gX[1][i])
-            gXsubs2 = gX[0][i].subs(x, gX[1][i + 1])
-            if gXsubs2 == zoo:
-                gXsubs2 = limit(gX[0][i + 1], x, gX[1][i + 1])
-            mapping.append([gXsubs1, gXsubs2])
-        # Create the support for the transformed random variable
-        trans_supp = []
-        for i in range(len(mapping)):
-            for j in range(2):
-                if mapping[i][j] not in trans_supp:
-                    trans_supp.append(mapping[i][j])
-        if zoo in trans_supp:
-            error_string = "complex infinity appears in the support, "
-            error_string += "please check for an undefined transformation "
-            error_string += "such as 1/0"
-            raise RVError(error_string)
-        trans_supp.sort()
-        # Find which segment of the transformation each transformation
-        #   function applies to
-        applist = []
-        for i in range(len(mapping)):
-            temp = []
-            for j in range(len(trans_supp) - 1):
-                if min(mapping[i]) <= trans_supp[j]:
-                    if max(mapping[i]) >= trans_supp[j + 1]:
-                        temp.append(j)
-            applist.append(temp)
-        # Find the appropriate inverse for each g(x)
-        ginv = []
-        for i in range(len(gX[0])):
-            # Find the 'test point' for the inverse
-            if [gX[1][i], gX[1][i + 1]] == [-oo, oo]:
-                c = 0
-            elif gX[1][i] == -oo and gX[1][i + 1] != oo:
-                c = gX[1][i + 1] - 1
-            elif gX[1][i] != -oo and gX[1][i + 1] == oo:
-                c = gX[1][i] + 1
-            else:
-                c = (gX[1][i] + gX[1][i + 1]) / 2
-            # Create a list of possible inverses
-            invlist = solve(gX[0][i] - t, x)
-            # Use the test point to determine the correct inverse
-            selected_inverse = False
-            for j in range(len(invlist)):
-                # If g-1(g(c))=c, then the inverse is correct
-                test = invlist[j].subs(t, gX[0][i].subs(x, c))
-                if simplify(test - c) == 0:
-                    ginv.append(invlist[j])
-                    selected_inverse = True
-                    break
-                try:
-                    if test <= Float(float(c), 10) + 0.0000001:
-                        if test >= Float(float(c), 10) - 0.0000001:
-                            ginv.append(invlist[j])
-                            selected_inverse = True
-                            break
-                except Exception:
-                    if j == len(invlist) - 1 and len(ginv) < i + 1:
-                        ginv.append(None)
-                        selected_inverse = True
-            # Some symbolic comparisons do not trigger either branch above.
-            # Fall back to the only available inverse when the mapping is
-            # unambiguous.
-            if not selected_inverse and len(invlist) == 1:
-                ginv.append(invlist[0])
-        # Find the transformation function for each segment'
-        seg_func = []
-        for i in range(len(X_dummy.func)):
-            # Only find transformation for applicable segments
-            for j in range(len(gX[0])):
-                if gX[1][j] >= X_dummy.support[i]:
-                    if gX[1][j + 1] <= X_dummy.support[i + 1]:
-                        if j >= len(ginv) or ginv[j] is None:
-                            continue
-                        # print X_dummy.func[i], ginv[j]
-                        if not isinstance(X_dummy.func[i], (float, int)):
-                            tran = X_dummy.func[i].subs(x, ginv[j])
-                            tran = tran * diff(ginv[j], t)
-                        else:
-                            tran = X_dummy.func[i] * diff(ginv[j], t)
-                        seg_func.append(tran)
-        # Sum the transformations for each piece of the transformed
-        #   random variable
-        trans_func = []
-        for i in range(len(trans_supp) - 1):
-            h = 0
-            for j in range(len(seg_func)):
-                if i in applist[j]:
-                    if mapping[j][0] < mapping[j][1]:
-                        h = h + seg_func[j]
-                    else:
-                        h = h - seg_func[j]
-            trans_func.append(h)
-        # Substitute x into the transformed random variable
-        trans_func2 = []
-        for i in range(len(trans_func)):
-            if not isinstance(trans_func[i], (int, float)):
-                trans_func2.append(simplify(trans_func[i].subs(t, x)))
-            else:
-                trans_func2.append(trans_func[i])
-        # Create and return the random variable
-        return RV(trans_func2, trans_supp, ["continuous", "pdf"])
-
-    # If the distribution in symbolic discrete, convert it and then compute
-    #   the transformation
-    if random_variable.is_discrete_functional():
-        for element in random_variable.support:
-            if (element in [-oo, oo]) or (isinstance(element, Symbol)):
-                err_string = "Transform is not implemented for discrete "
-                err_string += "random variables with symbolic or inifinite "
-                err_string += "support"
-                raise RVError(err_string)
-        X_dummy = Convert(random_variable)
-        return Transform(X_dummy, gXt)
-
-    # If the distribution is discrete, find and return the transformation
-    if random_variable.is_discrete():
-        gX = gXt
-        trans_sup = []
-        # Find the portion of the transformation each element
-        #   in the random variable applies to, and then transform it
-        for i in range(len(X_dummy.support)):
-            X_support = X_dummy.support[i]
-            if X_support < min(gX[1]) or X_support > max(gX[1]):
-                trans_sup.append(X_support)
-            for j in range(len(gX[1]) - 1):
-                if X_support >= gX[1][j] and X_support <= gX[1][j + 1]:
-                    trans_sup.append(gX[0][j].subs(x, X_dummy.support[i]))
-                    break
-                    # Break is required, otherwise points on the boundaries
-                    #   between two segments of the transformation will
-                    #   be entered twice
-        # Sort the function and support lists
-        sortlist = list(zip(trans_sup, X_dummy.func))
-        sortlist.sort()
-        translist = []
-        funclist = []
-        for i in range(len(sortlist)):
-            translist.append(sortlist[i][0])
-            funclist.append(sortlist[i][1])
-        # Combine redundant elements in the list
-        translist2 = []
-        funclist2 = []
-        for i in range(len(translist)):
-            if translist[i] not in translist2:
-                translist2.append(translist[i])
-                funclist2.append(funclist[i])
-            elif translist[i] in translist2:
-                idx = translist2.index(translist[i])
-                funclist2[idx] += funclist[i]
-        # Return the transformed random variable
-        return RV(funclist2, translist2, ["discrete", "pdf"])
-
-
-def Truncate(random_variable, supp):
-    """
-    Procedure Name: Truncate
-    Purpose: Truncate a random variable
-    Arguments: 1. random_variable: A random variable
-               2. supp: The support of the truncated random variable
-    Output:    1. A truncated random variable
-    """
-    # Check to make sure the support of the truncated random
-    #   variable is given in ascending order
-    if supp[0] > supp[1]:
-        raise RVError("The support must be given in ascending order")
-
-    # Conver the random variable to its pdf form
-    X_dummy = pdf(random_variable)
-    cdf_dummy = cdf(random_variable)
-
-    # If the random variable is continuous, find and return
-    #   the truncated random variable
-    if random_variable.is_continuous():
-        # Find the area of the truncated random variable
-        area = cdf(cdf_dummy, supp[1]) - cdf(cdf_dummy, supp[0])
-        # area=0
-        # for i in range(len(X_dummy.func)):
-        #    val=integrate(X_dummy.func[i],(x,X_dummy.support[i],
-        #                    X_dummy.support[i+1]))
-        #    area+=val
-        # print area
-        # Cut out parts of the distribution that don't fall
-        #   within the new limits
-        for i in range(len(X_dummy.func)):
-            if supp[0] >= X_dummy.support[i]:
-                if supp[0] <= X_dummy.support[i + 1]:
-                    lwindx = i
-            if supp[1] >= X_dummy.support[i]:
-                if supp[1] <= X_dummy.support[i + 1]:
-                    upindx = i
-        truncfunc = []
-        for i in range(len(X_dummy.func)):
-            if i >= lwindx and i <= upindx:
-                truncfunc.append(simplify(X_dummy.func[i] / area))
-        truncsupp = [supp[0]]
-        upindx += 1
-        for i in range(len(X_dummy.support)):
-            if i > lwindx and i < upindx:
-                truncsupp.append(X_dummy.support[i])
-        truncsupp.append(supp[1])
-        # Return the truncated random variable
-        return RV(truncfunc, truncsupp, ["continuous", "pdf"])
-
-    # If the random variable is a discrete function, find and return
-    #   the truncated random variable
-    if random_variable.is_discrete_functional():
-        # Find the area of the truncated random variable
-        area = cdf(cdf_dummy, supp[1]) - cdf(cdf_dummy, supp[0])
-        # Cut out parts of the distribution that don't fall
-        #   within the new limits
-        for i in range(len(X_dummy.func)):
-            if supp[0] >= X_dummy.support[i]:
-                if supp[0] <= X_dummy.support[i + 1]:
-                    lwindx = i
-            if supp[1] >= X_dummy.support[i]:
-                if supp[1] <= X_dummy.support[i + 1]:
-                    upindx = i
-        truncfunc = []
-        for i in range(len(X_dummy.func)):
-            if i >= lwindx and i <= upindx:
-                truncfunc.append(X_dummy.func[i] / area)
-        truncsupp = [supp[0]]
-        upindx += 1
-        for i in range(len(X_dummy.support)):
-            if i > lwindx and i < upindx:
-                truncsupp.append(X_dummy.support[i])
-        truncsupp.append(supp[1])
-        # Return the truncated random variable
-        return RV(truncfunc, truncsupp, ["discrete_functional", "pdf"])
-
-    # If the distribution is discrete, find and return the
-    #   truncated random variable
-    if random_variable.is_discrete():
-        # Find the area of the truncated random variable
-        area = 0
-        for i in range(len(X_dummy.support)):
-            if X_dummy.support[i] >= supp[0]:
-                if X_dummy.support[i] <= supp[1]:
-                    area += X_dummy.func[i]
-        # Truncate the random variable and find the probability
-        #   at each point
-        truncfunc = []
-        truncsupp = []
-        for i in range(len(X_dummy.support)):
-            if X_dummy.support[i] >= supp[0]:
-                if X_dummy.support[i] <= supp[1]:
-                    truncfunc.append(X_dummy.func[i] / area)
-                    truncsupp.append(X_dummy.support[i])
-        # Return the truncated random variable
-        return RV(truncfunc, truncsupp, ["discrete", "pdf"])
-
-
-def VerifyPDF(random_variable):
-    """
-    Procedure Name: VerifyPDF
+    Procedure Name: verify_pdf
     Purpose: Calls self.verify_pdf(). For compatibility with
                 original APPL syntax
     Arguments:  1. random_variable: a discrete random variable
@@ -1545,985 +927,6 @@ def VerifyPDF(random_variable):
     return random_variable.verify_pdf()
 
 
-# Procedures on Two Random Variables
-#
-# Procedures:
-#     Convolution(random_variable_1,random_variable_2)
-#     Mixture(MixParameters,MixRVs)
-#     Product(random_variable_1,random_variable_2)
-
-
-def Convolution(random_variable_1, random_variable_2):
-    """
-    Procedure Name: Convolution
-    Purpose: Compute the convolution of two independent
-                random variables
-    Arguments:  1. random_variable_1: A random variable
-                2. random_variable_2: A random variable
-    Output:     1. The convolution of random_variable_1 and random_variable_2
-    """
-    # If the two random variables are not both continuous or
-    #   both discrete, return an error
-    if random_variable_1.domain_type != random_variable_2.domain_type:
-        discr = ["discrete", "discrete_functional"]
-        if (random_variable_1.domain_type not in discr) and (
-            random_variable_2.domain_type not in discr
-        ):
-            raise RVError("Both random variables must have the same type")
-
-    # Convert both random variables to their PDF form
-    X1_dummy = pdf(random_variable_1)
-    X2_dummy = pdf(random_variable_2)
-
-    # If the distributions are continuous, find and return the convolution
-    #   of the two random variables
-    if random_variable_1.is_continuous():
-        # X1_dummy.drop_assumptions()
-        # X2_dummy.drop_assumptions()
-        # If the two distributions are both lifetime distributions, treat
-        #   as a special case
-        if random_variable_1.support == [0, oo] and random_variable_2.support == [0, oo]:
-            # x=Symbol('x',positive=True)
-            z = Symbol("z", positive=True)
-            func1 = X1_dummy.func[0]
-            func2 = X2_dummy.func[0].subs(x, z - x)
-            int_func = expand(func1 * func2)
-            conv = integrate(int_func, (x, 0, z), conds="none")
-            conv_final = conv.subs(z, x)
-            conv = expand(conv_final)
-            conv = simplify(conv_final)
-            return RV([conv_final], [0, oo], ["continuous", "pdf"])
-        # Otherwise, compute the convolution using the product method
-        elif random_variable_1.support == [0, 1] and random_variable_2.support == [0, 1]:
-            z = Symbol("z", positive=True)
-            xx = Symbol("xx", positive=True)
-            func1 = X1_dummy.func[0].subs(x, xx)
-            func2 = X2_dummy.func[0].subs(x, z - xx)
-            fz1 = integrate(func1 * func2, (xx, 0, z))
-            fz1 = fz1.subs(z, x)
-            fz2 = integrate(func1 * func2, (xx, z - 1, 1))
-            fz2 = fz2.subs(z, x)
-            return RV([fz1, fz2], [0, 1, 2], ["continuous", "pdf"])
-        else:
-            gln = [[ln(x)], [0, oo]]
-            ge = [[exp(x), exp(x)], [-oo, 0, oo]]
-            temp1 = Transform(X1_dummy, ge)
-            temp2 = Transform(X2_dummy, ge)
-            temp3 = Product(temp1, temp2)
-            fz = Transform(temp3, gln)
-            convfunc = []
-            for i in range(len(fz.func)):
-                convfunc.append(simplify(fz.func[i]))
-            return RV(convfunc, fz.support, ["continuous", "pdf"])
-
-    # If the two random variables are discrete in functinonal form,
-    #   find and return the convolution of the two random variables
-    if random_variable_1.is_discrete_functional():
-        for num in random_variable_1.support:
-            if not isinstance(num, (int, float)):
-                err_string = "Convolution does not currently work with"
-                err_string = " RVs that have symbolic or infinite support"
-                raise RVError(err_string)
-        random_variable_1 = Convert(random_variable_1)
-    if random_variable_2.is_discrete_functional():
-        for num in random_variable_1.support:
-            if not isinstance(num, (int, float)):
-                err_string = "Convolution does not currently work with"
-                err_string = " RVs that have symbolic or infinite support"
-                raise RVError(err_string)
-        random_variable_2 = Convert(random_variable_2)
-
-    # If the distributions are discrete, find and return the convolution
-    #   of the two random variables.
-    if random_variable_1.is_discrete():
-        # Convert each random variable to its pdf form
-        X1_dummy = pdf(random_variable_1)
-        X2_dummy = pdf(random_variable_2)
-        # Create function and support lists for the convolution of the
-        #   two random variables
-        convlist = []
-        funclist = []
-        for i in range(len(X1_dummy.support)):
-            for j in range(len(X2_dummy.support)):
-                convlist.append(X1_dummy.support[i] + X2_dummy.support[j])
-                funclist.append(X1_dummy.func[i] * X2_dummy.func[j])
-        # Sort the function and support lists for the convolution
-        sortlist = list(zip(convlist, funclist))
-        sortlist.sort()
-        convlist2 = []
-        funclist2 = []
-        for i in range(len(sortlist)):
-            convlist2.append(sortlist[i][0])
-            funclist2.append(sortlist[i][1])
-        # Remove redundant elements in the support list
-        convlist3 = []
-        funclist3 = []
-        for i in range(len(convlist2)):
-            if convlist2[i] not in convlist3:
-                convlist3.append(convlist2[i])
-                funclist3.append(funclist2[i])
-            else:
-                funclist3[convlist3.index(convlist2[i])] += funclist2[i]
-        # Create and return the new random variable
-        return RV(funclist3, convlist3, ["discrete", "pdf"])
-
-
-def Mixture(MixParameters, MixRVs):
-    """
-    Procedure Name: Mixture
-    Purpose: Mixes random variables X1,X2,...,Xn
-    Arguments:   1. MixParameters: A mix of probability weights
-                 2. MixRVs: RV's X1,X2,...,Xn
-    Output:      1. The mixture RV
-    """
-
-    # Check to make sure that the arguments are lists
-    if not isinstance(MixParameters, list) or not isinstance(MixRVs, list):
-        raise RVError("Both arguments must be in list format")
-    # Check to make sure the lists are of equal length
-    if len(MixParameters) != len(MixRVs):
-        raise RVError("Mix parameter and RV lists must be the same length")
-    # Check to make sure that the mix parameters are numeric
-    # and sum to 1
-    """
-    total=0
-    for i in range(len(MixParameters)):
-        if isinstance(MixParameters[i], Symbol):
-            raise RVError('ApplPy does not support symbolic mixtures')
-        total+=MixParameters[i]
-    if total<.9999 or total>1.0001:
-        raise RVError('Mix parameters must sum to one')
-    """
-    # Check to ensure that the mix rv's are all of the same type
-    #   (discrete or continuous)
-    for i in range(len(MixRVs)):
-        if MixRVs[0].domain_type != MixRVs[i].domain_type:
-            raise RVError("Mix RVs must be all continuous or discrete")
-    # Convert the Mix RVs to their PDF form
-    Mixfx = []
-    for i in range(len(MixRVs)):
-        Mixfx.append(pdf(MixRVs[i]))
-
-    # If the distributions are continuous, find and return the
-    #   mixture pdf
-    if Mixfx[0].is_continuous():
-        # X1_dummy.drop_assumptions()
-        # X2_dummy.drop_assumptions()
-        # Compute the support of the mixture as the union of the supports
-        #   of the mix rvs
-        MixSupp = []
-        for i in range(len(Mixfx)):
-            for j in range(len(Mixfx[i].support)):
-                if Mixfx[i].support[j] not in MixSupp:
-                    MixSupp.append(Mixfx[i].support[j])
-        MixSupp.sort()
-        # Compute and return the mixed PDF
-        fxnew = []
-        for i in range(len(MixSupp) - 1):
-            newMixfx = 0
-            for j in range(len(MixParameters)):
-                m = len(Mixfx[j].support) - 1
-                for k in range(m):
-                    if Mixfx[j].support[k] <= MixSupp[i]:
-                        if MixSupp[i + 1] <= Mixfx[j].support[k + 1]:
-                            buildfx = Mixfx[j].func[k] * MixParameters[j]
-                            newMixfx += buildfx
-            simplify(newMixfx)
-            fxnew.append(newMixfx)
-        # Return the mixture rv
-        return RV(fxnew, MixSupp, ["continuous", "pdf"])
-
-    # If the two random variables are discrete in functinonal form,
-    #   find and return the mixture of the two random variables
-    for i in range(len(Mixfx)):
-        if Mixfx[i].is_discrete_functional():
-            for num in Mixfx[i].support:
-                if not isinstance(num, (int, float)):
-                    err_string = "Mixture does not currently work with"
-                    err_string = " RVs that have symbolic or infinite support"
-                    raise RVError(err_string)
-            Mixfx[i] = Convert(Mixfx[i])
-
-    # If the distributions are discrete, find and return the
-    #   mixture pdf
-    if Mixfx[0].is_discrete():
-        # Compute the mixture rv by summing over the weights
-        MixSupp = []
-        fxnew = []
-        for i in range(len(Mixfx)):
-            for j in range(len(Mixfx[i].support)):
-                if Mixfx[i].support[j] not in MixSupp:
-                    MixSupp.append(Mixfx[i].support[j])
-                    fxnew.append(Mixfx[i].func[j] * MixParameters[i])
-                else:
-                    indx = MixSupp.index(Mixfx[i].support[j])
-                    val = Mixfx[i].func[j] * MixParameters[i]
-                    fxnew[indx] += val
-        # Sort the values
-        zip_list = list(zip(MixSupp, fxnew))
-        zip_list.sort()
-        fxnew = []
-        MixSupp = []
-        for i in range(len(zip_list)):
-            fxnew.append(zip_list[i][1])
-            MixSupp.append(zip_list[i][0])
-        return RV(fxnew, MixSupp, ["discrete", "pdf"])
-
-
-def Product(random_variable_1, random_variable_2):
-    """
-    Procedure Name: Product
-    Purpose: Compute the product of two independent
-                random variables
-    Arguments:  1. random_variable_1: A random variable
-                2. random_variable_2: A random variable
-    Output:     1. The product of random_variable_1 and random_variable_2
-    """
-    # If the random variable is continuous, find and return the
-    #   product of the two random variables
-    if random_variable_1.is_continuous():
-        # X1_dummy.drop_assumptions()
-        # X2_dummy.drop_assumptions()
-        v = Symbol("v", positive=True)
-        # Place zero in the support of X if it is not there already
-        X1 = pdf(random_variable_1)
-        xfunc = []
-        xsupp = []
-        for i in range(len(X1.func)):
-            xfunc.append(X1.func[i])
-            xsupp.append(X1.support[i])
-            if X1.support[i] < 0:
-                if X1.support[i + 1] > 0:
-                    xfunc.append(X1.func[i])
-                    xsupp.append(0)
-        xsupp.append(X1.support[len(X1.support) - 1])
-        X_dummy = RV(xfunc, xsupp, ["continuous", "pdf"])
-        # Place zero in the support of Y if it is not already there
-        Y1 = pdf(random_variable_2)
-        yfunc = []
-        ysupp = []
-        for i in range(len(Y1.func)):
-            yfunc.append(Y1.func[i])
-            ysupp.append(Y1.support[i])
-            if Y1.support[i] < 0:
-                if Y1.support[i + 1] > 0:
-                    yfunc.append(Y1.func[i])
-                    ysupp.append(0)
-        ysupp.append(Y1.support[len(Y1.support) - 1])
-        Y_dummy = RV(yfunc, ysupp, ["continuous", "pdf"])
-        # Initialize the support list for the product V=X*Y
-        vsupp = []
-        for i in range(len(X_dummy.support)):
-            for j in range(len(Y_dummy.support)):
-                val = X_dummy.support[i] * Y_dummy.support[j]
-                if val == nan:
-                    val = 0
-                if val not in vsupp:
-                    vsupp.append(val)
-        vsupp.sort()
-        # Initialize the pdf segments of v
-        vfunc = []
-        for i in range(len(vsupp) - 1):
-            vfunc.append(0)
-        # Loop through each piecewise segment of X
-        for i in range(len(X_dummy.func)):
-            # Loop through each piecewise segment of Y
-            for j in range(len(Y_dummy.func)):
-                # Define the corner of the rectangular region
-                a = X_dummy.support[i]
-                b = X_dummy.support[i + 1]
-                c = Y_dummy.support[j]
-                d = Y_dummy.support[j + 1]
-                # If the region is in the first quadrant, compute the
-                #   required integrals sequentially
-                if a >= 0 and c >= 0:
-                    v = Symbol("v", positive=True)
-                    if not isinstance(Y_dummy.func[j], (float, int)):
-                        gj = Y_dummy.func[j].subs(x, v / x)
-                    else:
-                        gj = Y_dummy.func[j]
-                    fi = X_dummy.func[i]
-                    pv = integrate(fi * gj * (1 / x), (x, a, b))
-                    if d < oo:
-                        qv = integrate(fi * gj * (1 / x), (x, v / d, b))
-                    if c > 0:
-                        rv = integrate(fi * gj * (1 / x), (x, a, v / c))
-                    if c > 0 and d < oo and a * d < b * c:
-                        sv = integrate(fi * gj * (1 / x), (x, v / d, v / c))
-                    # 1st Qd, Scenario 1
-                    if c == 0 and d == oo:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= 0:
-                                vfunc[k] += pv
-                    # 1st Qd, Scenario 2
-                    if c == 0 and d < oo:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= 0 and vsupp[k + 1] <= a * d:
-                                vfunc[k] += pv
-                            if vsupp[k] >= a * d and vsupp[k + 1] <= b * d:
-                                vfunc[k] += qv
-                    # 1st Qd, Scenario 3
-                    if c > 0 and d == oo:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= b * c:
-                                vfunc[k] += pv
-                            if vsupp[k] >= a * c and vsupp[k + 1] <= b * c:
-                                vfunc[k] += rv
-                    # 1st Qd, Scenario 4
-                    if c > 0 and d < oo:
-                        # Case 1
-                        if a * d < b * c:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= a * c and vsupp[k + 1] <= a * d:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= a * d and vsupp[k + 1] <= b * c:
-                                    vfunc[k] += sv
-                                if vsupp[k] >= b * c and vsupp[k + 1] <= b * d:
-                                    vfunc[k] += qv
-                        # Case 2
-                        if a * d == b * c:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= a * c and vsupp[k + 1] <= a * d:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= b * c and vsupp[k + 1] <= b * d:
-                                    vfunc[k] += qv
-                        # Case 3
-                        if a * d > b * c:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= a * c and vsupp[k + 1] <= b * c:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= b * c and vsupp[k + 1] <= a * d:
-                                    vfunc[k] += pv
-                                if vsupp[k] >= a * d and vsupp[k + 1] <= b * d:
-                                    vfunc[k] += qv
-                # If the region is in the second quadrant, compute
-                #   the required integrals sequentially
-                if a < 0 and c < 0:
-                    v = Symbol("v", positive=True)
-                    if not isinstance(Y_dummy.func[j], (float, int)):
-                        gj = Y_dummy.func[j].subs(x, v / x)
-                    else:
-                        gj = Y_dummy.func[j]
-                    fi = X_dummy.func[i]
-                    pv = -integrate(fi * gj * (1 / x), (x, a, b))
-                    if d < 0:
-                        qv = -integrate(fi * gj * (1 / x), (x, (v / d), b))
-                    if c > -oo:
-                        rv = -integrate(fi * gj * (1 / x), (x, a, (v / c)))
-                    if c > -oo and d < 0:
-                        sv = -integrate(fi * gj * (1 / x), (x, (v / d), (v / c)))
-                    # 2nd Qd, Scenario 1
-                    if c == -oo and d == 0:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= 0:
-                                vfunc[k] += pv
-                    # 2nd Qd, Scenario 2
-                    if c == -oo and d < 0:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= a * d and vsupp[k + 1] <= oo:
-                                vfunc[k] += pv
-                            if vsupp[k] >= b * d and vsupp[k + 1] <= a * d:
-                                vfunc[k] += qv
-                    # 2nd Qd, Scenario 3
-                    if c > -oo and d == 0:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= 0 and vsupp[k + 1] <= b * c:
-                                vfunc[k] += pv
-                            if vsupp[k] >= b * c and vsupp[k + 1] <= a * c:
-                                vfunc[k] += rv
-                    # 2nd Qd, Scenario 4
-                    if c > -oo and d < 0:
-                        # Case 1
-                        if a * d > b * c:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= a * d and vsupp[k + 1] <= a * c:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= b * c and vsupp[k + 1] <= a * d:
-                                    vfunc[k] += sv
-                                if vsupp[k] >= b * d and vsupp[k + 1] <= b * c:
-                                    vfunc[k] += qv
-                        # Case 2
-                        if a * d == b * c:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= a * d and vsupp[k + 1] <= a * c:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= b * d and vsupp[k + 1] <= b * c:
-                                    vfunc[k] += qv
-                        # Case 3
-                        if a * d < b * c:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= b * c and vsupp[k + 1] <= a * c:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= a * d and vsupp[k + 1] <= b * c:
-                                    vfunc[k] += pv
-                                if vsupp[k] >= b * d and vsupp[k + 1] <= a * d:
-                                    vfunc[k] += qv
-                # If the region is in the third quadrant, compute
-                #   the required integrals sequentially
-                if a < 0 and c >= 0:
-                    v = Symbol("v", negative=True)
-                    if not isinstance(Y_dummy.func[j], (float, int)):
-                        gj = Y_dummy.func[j].subs(x, v / x)
-                    else:
-                        gj = Y_dummy.func[j]
-                    fi = X_dummy.func[i]
-                    pv = -integrate(fi * gj * (1 / x), (x, a, b))
-                    if d < oo:
-                        qv = -integrate(fi * gj * (1 / x), (x, a, (v / d)))
-                    if c > 0:
-                        rv = -integrate(fi * gj * (1 / x), (x, (v / b), c))
-                    if c > 0 and d < oo:
-                        sv = -integrate(fi * gj * (1 / x), (x, (v / c), (v / d)))
-                    # 3rd Qd, Scenario 1
-                    if c == 0 and d == oo:
-                        for k in range(len(vfunc)):
-                            if vsupp[k + 1] <= 0:
-                                vfunc[k] += pv
-                    # 3rd Qd, Scenario 2
-                    if c == 0 and d < oo:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= b * d and vsupp[k + 1] <= 0:
-                                vfunc[k] += pv
-                            if vsupp[k] >= a * d and vsupp[k + 1] <= b * d:
-                                vfunc[k] += qv
-                    # 3rd Qd, Scenario 3
-                    if c > 0 and d == oo:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= -oo and vsupp[k + 1] <= a * c:
-                                vfunc[k] += pv
-                            if vsupp[k] >= a * c and vsupp[k + 1] <= b * c:
-                                vfunc[k] += rv
-                    # 3rd Qd, Scenario 4
-                    if c > 0 and d < oo:
-                        # Case 1
-                        if b * d > a * c:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= b * d and vsupp[k + 1] <= b * c:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= a * c and vsupp[k + 1] <= b * d:
-                                    vfunc[k] += sv
-                                if vsupp[k] >= a * d and vsupp[k + 1] <= a * c:
-                                    vfunc[k] += qv
-                        # Case 2
-                        if a * c == b * d:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= a * d and vsupp[k + 1] <= a * c:
-                                    vfunc[k] += qv
-                                if vsupp[k] >= b * d and vsupp[k + 1] <= b * c:
-                                    vfunc[k] += rv
-                        # Case 3
-                        if a * c > b * d:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= a * c and vsupp[k + 1] <= b * c:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= b * d and vsupp[k + 1] <= a * c:
-                                    vfunc[k] += pv
-                                if vsupp[k] >= a * d and vsupp[k + 1] <= b * d:
-                                    vfunc[k] += qv
-                # If the region is in the fourth quadrant, compute
-                #   the required integrals sequentially
-                if a >= 0 and c < 0:
-                    v = Symbol("v", negative=True)
-                    if not isinstance(Y_dummy.func[j], (float, int)):
-                        gj = Y_dummy.func[j].subs(x, v / x)
-                    else:
-                        gj = Y_dummy.func[j]
-                    fi = X_dummy.func[i]
-                    pv = integrate(fi * gj * (1 / x), (x, a, b))
-                    if d < 0:
-                        qv = integrate(fi * gj * (1 / x), (x, a, (v / d)))
-                    if c > -oo:
-                        rv = integrate(fi * gj * (1 / x), (x, (v / c), b))
-                    if c > -oo and d < 0:
-                        sv = integrate(fi * gj * (1 / x), (x, (v / c), (v / d)))
-                    # 4th Qd, Scenario 1
-                    if c == oo and d == 0:
-                        for k in range(len(vfunc)):
-                            if vsupp[k + 1] <= 0:
-                                vfunc[k] += pv
-                    # 4th Qd, Scenario 2
-                    if c == oo and d < 0:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= -oo and vsupp[k + 1] <= b * d:
-                                vfunc[k] += pv
-                            if vsupp[k] >= b * d and vsupp[k + 1] <= a * d:
-                                vfunc[k] += qv
-                    # 4th Qd, Scenario 3
-                    if c > -oo and d == 0:
-                        for k in range(len(vfunc)):
-                            if vsupp[k] >= a * c and vsupp[k + 1] <= 0:
-                                vfunc[k] += pv
-                            if vsupp[k] >= b * c and vsupp[k + 1] <= a * c:
-                                vfunc[k] += rv
-                    # 4th Qd, Scenario 4
-                    if c > -oo and d < 0:
-                        # Case 1
-                        if a * c > b * d:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= b * c and vsupp[k + 1] <= b * d:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= b * d and vsupp[k + 1] <= a * c:
-                                    vfunc[k] += sv
-                                if vsupp[k] >= a * c and vsupp[k + 1] <= a * d:
-                                    vfunc[k] += qv
-                        # Case 2
-                        if a * d == b * c:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= b * c and vsupp[k + 1] <= a * c:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= a * c and vsupp[k + 1] <= a * d:
-                                    vfunc[k] += qv
-                        # Case 3
-                        if a * c < b * d:
-                            for k in range(len(vfunc)):
-                                if vsupp[k] >= b * c and vsupp[k + 1] <= a * c:
-                                    vfunc[k] += rv
-                                if vsupp[k] >= a * c and vsupp[k + 1] <= b * d:
-                                    vfunc[k] += pv
-                                if vsupp[k] >= b * d and vsupp[k + 1] <= a * d:
-                                    vfunc[k] += qv
-        vfunc_final = []
-        for i in range(len(vfunc)):
-            if not isinstance(vfunc[i], (int, float)):
-                vfunc_final.append(simplify(vfunc[i]).subs(v, x))
-            else:
-                vfunc_final.append(vfunc[i])
-        return RV(vfunc_final, vsupp, ["continuous", "pdf"])
-
-    # If the two random variables are discrete in functinonal form,
-    #   find and return the product of the two random variables
-    if random_variable_1.is_discrete_functional():
-        for num in random_variable_1.support:
-            if not isinstance(num, (int, float)):
-                err_string = "Product does not currently work with"
-                err_string = " RVs that have symbolic or infinite support"
-                raise RVError(err_string)
-        random_variable_1 = Convert(random_variable_1)
-    if random_variable_2.is_discrete_functional():
-        for num in random_variable_1.support:
-            if not isinstance(num, (int, float)):
-                err_string = "Product does not currently work with"
-                err_string = " RVs that have symbolic or infinite support"
-                raise RVError(err_string)
-        random_variable_2 = Convert(random_variable_2)
-
-    # If the distributions are discrete, find and return the product
-    #   of the two random variables.
-    if random_variable_1.is_discrete():
-        # Convert each random variable to its pdf form
-        X1_dummy = pdf(random_variable_1)
-        X2_dummy = pdf(random_variable_2)
-        # Create function and support lists for the product of the
-        #   two random variables
-        prodlist = []
-        funclist = []
-        for i in range(len(X1_dummy.support)):
-            for j in range(len(X2_dummy.support)):
-                prodlist.append(X1_dummy.support[i] * X2_dummy.support[j])
-                funclist.append(X1_dummy.func[i] * X2_dummy.func[j])
-        # Sort the function and support lists for the convolution
-        sortlist = list(zip(prodlist, funclist))
-        sortlist.sort()
-        prodlist2 = []
-        funclist2 = []
-        for i in range(len(sortlist)):
-            prodlist2.append(sortlist[i][0])
-            funclist2.append(sortlist[i][1])
-        # Remove redundant elements in the support list
-        prodlist3 = []
-        funclist3 = []
-        for i in range(len(prodlist2)):
-            if prodlist2[i] not in prodlist3:
-                prodlist3.append(prodlist2[i])
-                funclist3.append(funclist2[i])
-            else:
-                funclist3[prodlist3.index(prodlist2[i])] += funclist2[i]
-        # Create and return the new random variable
-        return RV(funclist3, prodlist3, ["discrete", "pdf"])
-
-
-def ProductDiscrete(random_variable_1, random_variable_2):
-    """
-    Procedure Name: ProductDiscrete
-    Purpose: Compute the product of two independent
-                discrete random variables
-    Arguments:  1. random_variable_1: A random variable
-                2. random_variable_2: A random variable
-    Output:     1. The product of random_variable_1 and random_variable_2
-    """
-    # Ensure that both random variables are discrete
-    if not random_variable_1.is_discrete() or not random_variable_2.is_discrete():
-        raise RVError("both random variables must be discrete")
-    # Convert both random variables to pdf form
-    X_dummy1 = pdf(random_variable_1)
-    X_dummy2 = pdf(random_variable_2)
-    # Convert the support and the value of each random variable
-    #   into numpy arrays
-    support1 = np.asarray(X_dummy1.support, dtype=object)
-    support2 = np.asarray(X_dummy2.support, dtype=object)
-    pdf1 = np.asarray(X_dummy1.func, dtype=object)
-    pdf2 = np.asarray(X_dummy2.func, dtype=object)
-    # Find all possible values of support1*support2 and val1*val2
-    #   via the pairwise outer product, flatten into vectors
-    prodsupport = np.outer(support1, support2).flatten()
-    prodpdf = np.outer(pdf1, pdf2).flatten()
-    #
-    # Stack the support vector and the value vector into a matrix
-    # prodmatrix=np.vstack([prodsupport,prodpdf]).T
-    #
-    #
-    # Convert the resulting vectors into lists
-    supportlist = prodsupport.tolist()
-    pdflist = prodpdf.tolist()
-    # Sort the function and support lists for the product
-    sortlist = list(zip(supportlist, pdflist))
-    sortlist.sort()
-    prodlist2 = []
-    funclist2 = []
-    for i in range(len(sortlist)):
-        prodlist2.append(sortlist[i][0])
-        funclist2.append(sortlist[i][1])
-    # Remove redundant elements in the support list
-    prodlist3 = []
-    funclist3 = []
-    for i in range(len(prodlist2)):
-        if prodlist2[i] not in prodlist3:
-            prodlist3.append(prodlist2[i])
-            funclist3.append(funclist2[i])
-        else:
-            funclist3[prodlist3.index(prodlist2[i])] += funclist2[i]
-    # Create and return the new random variable
-    return RV(funclist3, prodlist3, ["discrete", "pdf"])
-
-
-# Utilities
-#
-# Procedures:
-#     Histogram(sample,bins)
-#     LoadRV(filename)
-#     PlotClear()
-#     PlotDist(random_variable,suplist)
-#     PlotDisplay(plot_list,suplist)
-#     PlotEmpCDF(data)
-#     PlotLimits(limits, axis)
-#     PPPlot(random_variable,sample)
-#     QQPlot(random_variable,sample)
-
-
-def Histogram(sample, Bins=None):
-    """
-    Procedure: Histogram
-    Purpose: Construct a histogram from a sample of data
-    Arguments: 1. sample: The data sample from which to construct
-                    the histogram
-               2. bins: The number of bins in the histogram
-    Output:    1. A histogram plot
-    """
-    # Check to ensure that the sample is given as a list
-    if not isinstance(sample, list):
-        raise RVError("The data sample must be entered as a list")
-
-    sample.sort()
-    if Bins is None:
-        Bins = 1
-        for i in range(1, len(sample)):
-            if sample[i] != sample[i - 1]:
-                Bins += 1
-
-    plt.ion()
-    plt.hist(sample, bins=Bins, normed=True)
-    plt.ylabel("Relative Frequency")
-    plt.xlabel("Observation Value")
-    plt.title("Histogram")
-    plt.grid(True)
-
-
-def LoadRV(filename):
-    """
-    Procedure: LoadRV
-    Purpose: Load a random variable from a binary file
-    Aruments:   1. filename: the name of the file
-                    where the random variable is stored
-    Output:     1. The stored random variable
-    """
-    fileObject = open(filename, "r")
-    random_variable = pickle.load(fileObject)
-    if "RV" not in random_variable.__class__.__name__:
-        print("WARNING: Object loaded is not a random variable")
-    return random_variable
-
-
-def PlotClear():
-    """
-    Procedure: PlotClear
-    Purpose: Clears the plot display
-    Arguments:  None
-    Output:     1. Clear plot display
-    """
-    plt.clf()
-
-
-def PlotLimits(limits, axis):
-    """
-    Procedure: PlotLimits
-    Purpose: Sets the limits of a plot
-    Arguments:  1. limits: A list of plot limits
-    Output:     1. Plot with limits reset
-    """
-    axes = plt.gca()
-    if axis == "x":
-        axes.set_xlim(limits)
-    elif axis == "y":
-        axes.set_ylim(limits)
-    else:
-        err_str = 'The axis parameter in PlotLimits must be "x" or "y"'
-        raise RVError(err_str)
-
-
-def PlotDist(random_variable, suplist=None, opt=None, color="r", display=True):
-    """
-    Procedure: PlotDist
-    Purpose: Plot a random variable
-    Arguments:  1. random_variable: A random variable
-                2. suplist: A list of supports for the plot
-    Output:     1. A plot of the random variable
-    """
-    # Create the labels for the plot
-    if random_variable.is_cdf():
-        # lab1='F(x)'
-        lab2 = "Cumulative Distribution Function"
-    elif random_variable.is_chf():
-        # lab1='H(x)'
-        lab2 = "Cumulative Hazard Function"
-    elif random_variable.is_hf():
-        # lab1='h(x)'
-        lab2 = "Hazard Function"
-    elif random_variable.is_idf():
-        # lab1='F-1(s)'
-        lab2 = "Inverse Density Function"
-    elif random_variable.is_pdf():
-        # lab1='f(x)'
-        lab2 = "Probability Density Function"
-    elif random_variable.is_sf():
-        # lab1='S(X)'
-        lab2 = "Survivor Function"
-
-    if opt == "EMPCDF":
-        lab2 = "Empirical CDF"
-
-    # If the distribution is continuous, plot the function
-    if random_variable.is_continuous():
-        # Return an error if the plot supports are not
-        #   within the support of the random variable
-        if suplist is not None:
-            if suplist[0] > suplist[1]:
-                raise RVError("Support list must be in ascending order")
-            if suplist[0] < random_variable.support[0]:
-                raise RVError("Plot supports must fall within RV support")
-            if suplist[1] > random_variable.support[1]:
-                raise RVError("Plot support must fall within RV support")
-        # Cut out parts of the distribution that don't fall
-        #   within the limits of the plot
-        if suplist is None:
-            # Since plotting is numeric, the lower support cannot be -oo
-            if random_variable.support[0] == -oo:
-                support1 = float(random_variable.variate(s=0.01)[0])
-            else:
-                support1 = float(random_variable.support[0])
-            # Since plotting is numeric, the upper support cannot be oo
-            if random_variable.support[len(random_variable.support) - 1] == oo:
-                support2 = float(random_variable.variate(s=0.99)[0])
-            else:
-                support2 = float(random_variable.support[len(random_variable.support) - 1])
-            suplist = [support1, support2]
-        for i in range(len(random_variable.func)):
-            if suplist[0] >= float(random_variable.support[i]):
-                if suplist[0] <= float(random_variable.support[i + 1]):
-                    lwindx = i
-            if suplist[1] >= float(random_variable.support[i]):
-                if suplist[1] <= float(random_variable.support[i + 1]):
-                    upindx = i
-        # Create a list of functions for the plot
-        plotfunc = []
-        for i in range(len(random_variable.func)):
-            if i >= lwindx and i <= upindx:
-                plotfunc.append(random_variable.func[i])
-        # Create a list of supports for the plot
-        plotsupp = [suplist[0]]
-        upindx += 1
-        for i in range(len(random_variable.support)):
-            if i > lwindx and i < upindx:
-                plotsupp.append(random_variable.support[i])
-        plotsupp.append(suplist[1])
-
-        # print plotfunc, plotsupp
-        for i, function in enumerate(plotfunc):
-
-            def f(y):
-                return function.subs(x, y).evalf()
-
-            x_range = np.arange(
-                plotsupp[i], plotsupp[i + 1], abs(plotsupp[i + 1] - plotsupp[i]) / 1000
-            )
-            y_range = np.array([f(num) for num in x_range])
-            plt.plot(x_range, y_range, color)
-        plt.title(lab2)
-
-        """
-        Old plot method using the sympy plot
-        plt.ioff()
-        print plotfunc, plotsupp
-        initial_plot=plot(plotfunc[0],(x,plotsupp[0],plotsupp[1]),
-                          title=lab2,show=False,line_color=color)
-        for i in range(1,len(plotfunc)):
-            plot_extension=plot(plotfunc[i],
-                               (x,plotsupp[i],plotsupp[i+1]),
-                                show=False,line_color=color)
-            initial_plot.append(plot_extension[0])
-        if display is True:
-            plt.ion()
-            initial_plot.show()
-            return initial_plot
-        else:
-            return initial_plot
-        """
-
-        # Old PlotDist code before sympy created the
-        #   plotting front-end
-        # print plotsupp
-        # Parse the functions for matplotlib
-        # plot_func=[]
-        # for i in range(len(plotfunc)):
-        #    strfunc=str(plotfunc[i])
-        #    plot_func.append(strfunc)
-        # print plot_func
-        # Display the plot
-        # if opt!='display':
-        #    plt.ion()
-        # plt.mat_plot(plot_func,plotsupp,lab1,lab2,'continuous')
-
-    if random_variable.is_discrete() or random_variable.is_discrete_functional():
-        if random_variable.is_discrete_functional():
-            if random_variable.support[-1] != oo:
-                random_variable = Convert(random_variable)
-            else:
-                p = 1
-                i = random_variable.support[0]
-                while p > 0.00001:
-                    p = pdf(random_variable, i).evalf()
-                    i += 1
-                newsupport = random_variable.support
-                newsupport[-1] = i
-                random_variable = RV(
-                    random_variable.func,
-                    newsupport,
-                    functional_form=random_variable.functional_form,
-                    domain_type=random_variable.domain_type,
-                )
-                random_variable = Convert(random_variable)
-        # if display==True:
-        #    plt.ion()
-        # plt.mat_plot(random_variable.func,random_variable.support,lab1,lab2,'discrete')
-        plt.step(random_variable.support, random_variable.func)
-        # plt.xlabel('x')
-        # if lab1!=None:
-        #    plt.ylabel(lab1)
-        if lab2 is not None:
-            plt.title(lab2)
-
-
-def PlotDisplay(plot_list):
-    if len(plot_list) < 2:
-        raise RVError("PlotDisplay requires a list with multiple plots")
-    plt.ion()
-    totalplot = plot_list[0]
-    for graph in plot_list[1:]:
-        totalplot.append(graph[0])
-    totalplot.show()
-
-
-def PlotEmpCDF(data):
-    """
-    Procedure Name: PlotEmpCDF
-    Purpose: Plots an empirical CDF, given a data set
-    Arguments:  1. data: A data sample
-    Output:     1. An empirical cdf of the data
-    """
-
-    # Create a bootstrap random variable from the data
-    Xstar = BootstrapRV(data)
-    PlotDist(cdf(Xstar), opt="EMPCDF")
-
-
-def PPPlot(random_variable, sample):
-    """
-    Procedure Name: PPPlot
-    Purpose: Plots the model probability versus the sample
-                probability
-    Arguments:  1. random_variable: A random variable
-                2. sample: An experimental sample
-    Output:     1. A PPPlot comparing the sample to a theoretical
-                    model
-    """
-    # Return an error message if the sample is not given as
-    #   a list
-    if not isinstance(sample, list):
-        raise RVError("The data sample must be given as a list")
-
-    # Create a list of quantiles
-    n = len(sample)
-    sample.sort()
-    plist = []
-    for i in range(1, n + 1):
-        p = (i - (1 / 2)) / n
-        plist.append(p)
-
-    # Create a list of CDF values for the sample and the
-    # theoretical model
-    FX = cdf(random_variable)
-    fxstar = BootstrapRV(sample)
-    FXstar = cdf(fxstar)
-
-    FittedCDF = []
-    ObservedCDF = []
-    for i in range(len(plist)):
-        FittedCDF.append(cdf(FX, sample[i]))
-        ObservedCDF.append(cdf(FXstar, sample[i]))
-
-    # Plot the results
-    plt.ion()
-    plt.prob_plot(ObservedCDF, FittedCDF, "PP Plot")
-
-
-def QQPlot(random_variable, sample):
-    """
-    Procedure: QQPlot
-    Purpose: Plots the q_i quantile of a fitted distribution
-                versus the q_i quantile of the sample dist
-    Arguments:  1. random_variable: A random variable
-                2. sample: sample data
-    Output:     1. QQ Plot
-    """
-    # Return an error message is the sample is not given as
-    #   a list
-    if not isinstance(sample, list):
-        raise RVError("The data sample must be given as a list")
-
-    # Create a list of quantiles
-    n = len(sample)
-    sample.sort()
-    qlist = []
-    for i in range(1, n + 1):
-        q = (i - (1 / 2)) / n
-        qlist.append(q)
-    # Create 'fitted' list
-    Fitted = []
-    for i in range(len(qlist)):
-        Fitted.append(random_variable.variate(s=qlist[i])[0])
-
-    # Plot the results
-    plt.ion()
-    plt.prob_plot(sample, Fitted, "QQ Plot")
-
-
-# Backward-compatible re-export for direct imports from applpy.rv.
+# Backward-compatible aliases for legacy APPLPy function names.
+BootstrapRV = bootstrap_rv
+VerifyPDF = verify_pdf
