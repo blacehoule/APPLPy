@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use num_rational::Rational64;
 use num_traits::cast::ToPrimitive;
 
 use crate::algorithms::conversion;
@@ -224,6 +225,88 @@ pub fn verify_pdf(function: &[Number], tolerance: Option<f64>) -> Result<bool, S
     Ok((area > 1.0 - tolerance) && (area < 1.0 + tolerance))
 }
 
+/// Constructs a discrete random variable from an array of variates
+///
+/// # Arguments
+/// * `variates` - a list of numbers, which represent data observations
+///
+/// # Returns
+/// * `support` - the support of the random variable, which is a sorted
+///   and deduplicated vector of variates
+/// * `function` - the probability of each variate, assuming each is equally likely
+///
+/// # Examples
+/// ```
+/// use applpy_rust::algorithms::number::Number;
+/// use applpy_rust::algorithms::rv::{bootstrap_rv, FunctionalForm};
+/// use num_rational::Rational64;
+///
+/// let variates = vec![
+///     Number::Integer(2),
+///     Number::Integer(1),
+///     Number::Integer(1),
+///     Number::Integer(2),
+/// ];
+///
+/// let rv = bootstrap_rv(&variates).unwrap();
+///
+/// assert_eq!(rv.support, vec![Number::Integer(1), Number::Integer(2)]);
+/// assert_eq!(
+///     rv.function,
+///     vec![
+///         Number::Rational(Rational64::new(1, 2)),
+///         Number::Rational(Rational64::new(1, 2))
+///     ]
+/// );
+/// assert_eq!(rv.functional_form, FunctionalForm::Pdf);
+/// ```
+pub fn bootstrap_rv(variates: &[Number]) -> Result<RandomVariable, String> {
+    if variates.is_empty() {
+        return Err("at least one variate is required to construct the bootstrap rv".to_string());
+    }
+
+    let mut sorted_variates = variates.to_vec();
+    sorted_variates.sort_by(|a, b| {
+        let first = a.to_f64();
+        let second = b.to_f64();
+        first.total_cmp(&second)
+    });
+
+    let num_items = sorted_variates.len();
+    let num_observations: i64 = num_items
+        .try_into()
+        .expect("could not convert sorted variate length to number");
+    let base_probability = Number::Rational(Rational64::new(1, num_observations));
+
+    let mut function = Vec::new();
+    let mut support = Vec::new();
+
+    let mut current_probability = base_probability;
+    let mut current_variate = sorted_variates[0];
+
+    for &variate in sorted_variates.iter().skip(1) {
+        if variate == current_variate {
+            current_probability += base_probability;
+        } else {
+            support.push(current_variate);
+            function.push(current_probability);
+            current_variate = variate;
+            current_probability = base_probability;
+        }
+    }
+
+    function.push(current_probability);
+    support.push(current_variate);
+
+    let random_variable = RandomVariable {
+        function,
+        support,
+        functional_form: FunctionalForm::Pdf,
+        domain_type: DomainType::Discrete,
+    };
+    Ok(random_variable)
+}
+
 /// Evaluates a random variable at a specific value. Used to compute F(x) for
 /// the random variable
 ///
@@ -365,6 +448,54 @@ mod tests {
             domain_type: DomainType::Continuous,
         };
         assert!(!rv.verify_pdf(None).unwrap());
+    }
+
+    #[test]
+    fn bootstrap_rv_returns_error_for_empty_input() {
+        let result = bootstrap_rv(&[]);
+
+        assert!(matches!(
+            result,
+            Err(msg) if msg == "at least one variate is required to construct the bootstrap rv"
+        ));
+    }
+
+    #[test]
+    fn bootstrap_rv_sorts_support_and_aggregates_duplicates() {
+        let variates = vec![
+            Number::Integer(3),
+            Number::Integer(1),
+            Number::Integer(3),
+            Number::Integer(2),
+            Number::Integer(1),
+        ];
+
+        let rv = bootstrap_rv(&variates).unwrap();
+
+        assert_eq!(
+            rv.support,
+            vec![Number::Integer(1), Number::Integer(2), Number::Integer(3)]
+        );
+        assert_eq!(
+            rv.function,
+            vec![
+                Number::Rational(Rational64::new(2, 5)),
+                Number::Rational(Rational64::new(1, 5)),
+                Number::Rational(Rational64::new(2, 5)),
+            ]
+        );
+        assert!(matches!(rv.functional_form, FunctionalForm::Pdf));
+        assert!(matches!(rv.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn bootstrap_rv_handles_single_observation() {
+        let rv = bootstrap_rv(&[Number::Integer(7)]).unwrap();
+
+        assert_eq!(rv.support, vec![Number::Integer(7)]);
+        assert_eq!(rv.function, vec![Number::Rational(Rational64::new(1, 1))]);
+        assert!(matches!(rv.functional_form, FunctionalForm::Pdf));
+        assert!(matches!(rv.domain_type, DomainType::Discrete));
     }
 
     #[test]
