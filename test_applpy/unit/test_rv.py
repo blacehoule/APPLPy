@@ -1,7 +1,6 @@
 import pytest
 from sympy import Integer, Rational
 
-from applpy.algebra import _product_discrete as ProductDiscrete
 from applpy.appl_plot import plot_dist, plot_emp_cdf, pp_plot, qq_plot
 from applpy import rust_bindings
 from applpy.rv import (
@@ -106,6 +105,21 @@ def test_bootstrap_rv_creates_discrete_pdf_with_frequencies():
     assert rv.func == [Rational(1, 4), Rational(1, 4), Rational(1, 2)]
 
 
+def test_fast_rv_round_trip_conversion_methods():
+    rv = _discrete_pdf_bernoulli()
+
+    fast_rv = rv.to_fast_rv()
+    assert fast_rv.__class__.__name__ == "FastRV"
+    assert fast_rv.function == rv.func
+    assert fast_rv.support == rv.support
+    assert fast_rv.functional_form == rv.functional_form
+    assert fast_rv.domain_type == rv.domain_type
+
+    converted = RV.from_fast_rv(fast_rv)
+    assert isinstance(converted, RV)
+    assert converted == rv
+
+
 def test_next_combination_advances_lexicographically():
     assert rust_bindings.next_combination([1, 2, 4], 5) == [1, 2, 5]
     assert rust_bindings.next_combination([1, 4, 5], 5) == [2, 3, 4]
@@ -171,15 +185,16 @@ def test_single_rv_transformative_operations():
 def test_two_rv_operations_for_continuous_and_discrete():
     discrete = _discrete_pdf()
     bernoulli = _discrete_pdf_bernoulli()
+    product = discrete * bernoulli
 
-    assert isinstance(ProductDiscrete(discrete, bernoulli), RV)
+    assert isinstance(product, RV)
 
 
 def test_two_rv_operations_error_paths():
     discrete = _discrete_pdf()
 
-    with pytest.raises(RVError, match="both random variables must be discrete"):
-        ProductDiscrete(_uniform_continuous_pdf(), discrete)
+    with pytest.raises(RVError, match="both random variables must have the same functional form"):
+        _uniform_continuous_pdf() * discrete
 
 
 def test_plotting_and_misc_utility_paths():
