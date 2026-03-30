@@ -2,6 +2,7 @@
 
 use crate::algorithms::number::Number;
 use crate::algorithms::rv::{DomainType, FunctionalForm, RandomVariable};
+use crate::algorithms::shared;
 
 /// Computes the product of two independent discrete random variables
 ///
@@ -86,39 +87,11 @@ pub fn product_discrete(
         }
     }
 
-    // Sort the multiplied support and function values
-    let mut raw_product_pairs: Vec<_> = raw_product_support
-        .into_iter()
-        .zip(raw_product_function)
-        .collect();
-    raw_product_pairs.sort_by(|a, b| {
-        let first_value = a.0.to_f64();
-        let second_value = b.0.to_f64();
-        first_value.total_cmp(&second_value)
-    });
-
     let (sorted_support, sorted_function): (Vec<Number>, Vec<Number>) =
-        raw_product_pairs.into_iter().unzip();
+        shared::sort_by_support(raw_product_support, raw_product_function)?;
 
-    // De-duplicate the support. If a value appears multiple times in the
-    // support, combine the probabilities
-    let mut product_function = Vec::new();
-    let mut product_support = Vec::new();
-    for (&s, &probability) in sorted_support.iter().zip(sorted_function.iter()) {
-        let support_index = product_support
-            .iter()
-            .position(|&x: &Number| x.to_f64() == s.to_f64());
-
-        match support_index {
-            Some(index) => {
-                product_function[index] += probability;
-            }
-            None => {
-                product_function.push(probability);
-                product_support.push(s);
-            }
-        }
-    }
+    let (product_support, product_function) =
+        shared::deduplicate_support(sorted_support, sorted_function)?;
 
     let product_rv = RandomVariable {
         function: product_function,
@@ -211,38 +184,11 @@ pub fn convolution_discrete(
         }
     }
 
-    // Sorts the results by the support values
-    let mut raw_conv_pairs: Vec<_> = raw_conv_support
-        .into_iter()
-        .zip(raw_conv_function)
-        .collect();
-
-    raw_conv_pairs.sort_by(|a, b| {
-        let first_value = a.0.to_f64();
-        let second_value = b.0.to_f64();
-        first_value.total_cmp(&second_value)
-    });
-
     let (sorted_support, sorted_function): (Vec<Number>, Vec<Number>) =
-        raw_conv_pairs.into_iter().unzip();
+        shared::sort_by_support(raw_conv_support, raw_conv_function)?;
 
-    // Remove redundant elements from the support
-    let mut conv_support = Vec::new();
-    let mut conv_function = Vec::new();
-
-    for (&s, &f) in sorted_support.iter().zip(sorted_function.iter()) {
-        let support_index = conv_support.iter().position(|&x| x == s);
-
-        match support_index {
-            Some(index) => {
-                conv_function[index] += f;
-            }
-            None => {
-                conv_support.push(s);
-                conv_function.push(f);
-            }
-        }
-    }
+    let (conv_support, conv_function) =
+        shared::deduplicate_support(sorted_support, sorted_function)?;
 
     let sum_rv = RandomVariable {
         function: conv_function,

@@ -2,6 +2,7 @@
 
 use crate::algorithms::number::Number;
 use crate::algorithms::rv::{DomainType, FunctionalForm, RandomVariable};
+use crate::algorithms::shared;
 
 /// Truncates a discrete random variable by cutting off a portion of the support
 /// and normalizing total probability of the distribution to 1.
@@ -204,18 +205,8 @@ pub fn mixture_discrete(
         }
     }
 
-    let mut raw_mixture_pair: Vec<_> = raw_mixture_support
-        .into_iter()
-        .zip(raw_mixture_function)
-        .collect();
-
-    raw_mixture_pair.sort_by(|a, b| {
-        let first_value = a.0.to_f64();
-        let second_value = b.0.to_f64();
-        first_value.total_cmp(&second_value)
-    });
-
-    let (mixture_support, mixture_function) = raw_mixture_pair.into_iter().unzip();
+    let (mixture_support, mixture_function) =
+        shared::sort_by_support(raw_mixture_support, raw_mixture_function)?;
 
     let mix_rv = RandomVariable {
         function: mixture_function,
@@ -224,6 +215,172 @@ pub fn mixture_discrete(
         domain_type: DomainType::Discrete,
     };
     Ok(mix_rv)
+}
+
+pub struct Transformation {
+    pub mapping: fn(Number) -> Number,
+    pub min_support: Number,
+    pub max_support: Number,
+}
+
+/// Computes a transformation of a discrete random variable
+///
+/// # Arugments
+/// * `random_variable`- the random variable to transform
+/// * `transformation` - the transformation to apply to the random variable
+///
+/// # Returns
+/// * `transformed_rv` - the transformed random variable
+///
+/// # Examples
+/// ```
+/// use applpy_rust::algorithms::number::Number;
+/// use applpy_rust::algorithms::rv::{DomainType, FunctionalForm, RandomVariable};
+/// use applpy_rust::algorithms::transform::{transform_discrete, Transformation};
+/// use num_rational::Rational64;
+///
+/// let rv = RandomVariable {
+///     function: vec![
+///         Number::Rational(Rational64::new(1, 10)),
+///         Number::Rational(Rational64::new(2, 10)),
+///         Number::Rational(Rational64::new(3, 10)),
+///         Number::Rational(Rational64::new(4, 10)),
+///     ],
+///     support: vec![
+///         Number::Integer(1),
+///         Number::Integer(2),
+///         Number::Integer(3),
+///         Number::Integer(4),
+///     ],
+///     functional_form: FunctionalForm::Pdf,
+///     domain_type: DomainType::Discrete,
+/// };
+///
+/// let transformed = transform_discrete(
+///     &rv,
+///     &[
+///         Transformation {
+///             mapping: |x| x * Number::Integer(2),
+///             min_support: Number::Integer(1),
+///             max_support: Number::Integer(3),
+///         },
+///         Transformation {
+///             mapping: |x| x + Number::Integer(10),
+///             min_support: Number::Integer(3),
+///             max_support: Number::Integer(5),
+///         },
+///     ],
+/// )
+/// .unwrap();
+///
+/// assert_eq!(
+///     transformed.support,
+///     vec![
+///         Number::Integer(2),
+///         Number::Integer(4),
+///         Number::Integer(6),
+///         Number::Integer(14),
+///     ]
+/// );
+/// assert_eq!(
+///     transformed.function,
+///     vec![
+///         Number::Rational(Rational64::new(1, 10)),
+///         Number::Rational(Rational64::new(2, 10)),
+///         Number::Rational(Rational64::new(3, 10)),
+///         Number::Rational(Rational64::new(4, 10)),
+///     ]
+/// );
+/// ```
+pub fn transform_discrete(
+    random_variable: &RandomVariable,
+    transformations: &[Transformation],
+) -> Result<RandomVariable, String> {
+    let pdf_random_variable = random_variable.to_pdf()?;
+    let support = pdf_random_variable.support;
+    let function = pdf_random_variable.function;
+
+    if transformations.is_empty() {
+        return Err("at least one transformation is required".to_string());
+    }
+
+    // Validate that each transformation range is increasing.
+    for transformation in transformations {
+        if transformation.min_support >= transformation.max_support {
+            return Err(
+                "the max range of the transformation must exceeed the min range".to_string(),
+            );
+        }
+    }
+
+    // Validate that the transformations are adjacent.
+    for window in transformations.windows(2) {
+        let current_transformation = &window[0];
+        let next_transformation = &window[1];
+
+        if current_transformation.max_support != next_transformation.min_support {
+            return Err("the transformation ranges must be adjacent".to_string());
+        }
+    }
+
+    // Validate that the transformations cover the support
+    let lowest_support = support.first().expect("unable to extract lowest support");
+    let lowest_transform = transformations
+        .first()
+        .expect("unable to extract lowest transform")
+        .min_support;
+    if *lowest_support < lowest_transform {
+        return Err(
+            "the minimum transformation support is higher than the minimum rv support".to_string(),
+        );
+    }
+
+    let highest_support = support.last().expect("unable to extract highest support");
+    let highest_transform = transformations
+        .last()
+        .expect("unable to extract highest transform")
+        .max_support;
+    if *highest_support > highest_transform {
+        return Err(
+            "the maxium transformation support is lower than the maximum rv support".to_string(),
+        );
+    }
+
+    // Compute the transformed support and preserve the original probabilities.
+    let mut raw_transformed_pairs = Vec::new();
+    for (&s, &probability) in support.iter().zip(function.iter()) {
+        for transformation in transformations {
+            let mapping = &transformation.mapping;
+            if s >= transformation.min_support && s <= transformation.max_support {
+                let raw_transformed_support_value = mapping(s);
+                raw_transformed_pairs.push((raw_transformed_support_value, probability));
+                // Break to avoid inserting multiple transformed entries for
+                // any given support value
+                break;
+            }
+        }
+    }
+
+    raw_transformed_pairs.sort_by(|a, b| {
+        let first_value = a.0.to_f64();
+        let second_value = b.0.to_f64();
+        first_value.total_cmp(&second_value)
+    });
+
+    let (sorted_support, sorted_function): (Vec<Number>, Vec<Number>) =
+        raw_transformed_pairs.into_iter().unzip();
+
+    let (transformed_support, transformed_function) =
+        shared::deduplicate_support(sorted_support, sorted_function)?;
+
+    let transformed_rv = RandomVariable {
+        function: transformed_function,
+        support: transformed_support,
+        functional_form: FunctionalForm::Pdf,
+        domain_type: DomainType::Discrete,
+    };
+
+    Ok(transformed_rv)
 }
 
 #[cfg(test)]
@@ -353,6 +510,139 @@ mod tests {
         assert!(matches!(
             result,
             Err(msg) if msg == "the mix weights must sum to one"
+        ));
+    }
+
+    #[test]
+    fn transform_discrete_uses_first_range_for_shared_boundary() {
+        let rv = sample_discrete_rv();
+
+        let transformed = transform_discrete(
+            &rv,
+            &[
+                Transformation {
+                    mapping: |x| x * Number::Integer(2),
+                    min_support: Number::Integer(1),
+                    max_support: Number::Integer(3),
+                },
+                Transformation {
+                    mapping: |x| x + Number::Integer(10),
+                    min_support: Number::Integer(3),
+                    max_support: Number::Integer(5),
+                },
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            transformed.support,
+            vec![
+                Number::Integer(2),
+                Number::Integer(4),
+                Number::Integer(6),
+                Number::Integer(14),
+            ]
+        );
+        assert_eq!(
+            transformed.function,
+            vec![
+                Number::Rational(Rational64::new(1, 10)),
+                Number::Rational(Rational64::new(2, 10)),
+                Number::Rational(Rational64::new(3, 10)),
+                Number::Rational(Rational64::new(4, 10)),
+            ]
+        );
+        assert!(matches!(transformed.functional_form, FunctionalForm::Pdf));
+        assert!(matches!(transformed.domain_type, DomainType::Discrete));
+    }
+
+    #[test]
+    fn transform_discrete_returns_error_for_empty_transformations() {
+        let rv = sample_discrete_rv();
+        let result = transform_discrete(&rv, &[]);
+
+        assert!(matches!(
+            result,
+            Err(msg) if msg == "at least one transformation is required"
+        ));
+    }
+
+    #[test]
+    fn transform_discrete_returns_error_for_single_invalid_range() {
+        let rv = sample_discrete_rv();
+        let result = transform_discrete(
+            &rv,
+            &[Transformation {
+                mapping: |x| x,
+                min_support: Number::Integer(1),
+                max_support: Number::Integer(1),
+            }],
+        );
+
+        assert!(matches!(
+            result,
+            Err(msg) if msg == "the max range of the transformation must exceeed the min range"
+        ));
+    }
+
+    #[test]
+    fn transform_discrete_returns_error_when_ranges_are_not_adjacent() {
+        let rv = sample_discrete_rv();
+        let result = transform_discrete(
+            &rv,
+            &[
+                Transformation {
+                    mapping: |x| x,
+                    min_support: Number::Integer(1),
+                    max_support: Number::Integer(2),
+                },
+                Transformation {
+                    mapping: |x| x,
+                    min_support: Number::Integer(3),
+                    max_support: Number::Integer(5),
+                },
+            ],
+        );
+
+        assert!(matches!(
+            result,
+            Err(msg) if msg == "the transformation ranges must be adjacent"
+        ));
+    }
+
+    #[test]
+    fn transform_discrete_returns_error_when_transformations_do_not_cover_min_support() {
+        let rv = sample_discrete_rv();
+        let result = transform_discrete(
+            &rv,
+            &[Transformation {
+                mapping: |x| x,
+                min_support: Number::Integer(2),
+                max_support: Number::Integer(5),
+            }],
+        );
+
+        assert!(matches!(
+            result,
+            Err(msg) if msg == "the minimum transformation support is higher than the minimum rv support"
+        ));
+    }
+
+    #[test]
+    fn transform_discrete_returns_error_when_transformations_do_not_cover_max_support() {
+        let rv = sample_discrete_rv();
+        let result = transform_discrete(
+            &rv,
+            &[Transformation {
+                mapping: |x| x,
+                min_support: Number::Integer(1),
+                max_support: Number::Integer(3),
+            }],
+        );
+
+        assert!(matches!(
+            result,
+            Err(msg) if msg == "the maxium transformation support is lower than the maximum rv support"
         ));
     }
 }
